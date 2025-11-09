@@ -10,12 +10,17 @@ import {
   Users,
   DollarSign,
   AlertCircle,
+  User,
+  TrendingUp,
+  Package,
+  History,
+  Tag,
+  Receipt,
 } from 'lucide-react';
-// TODO: Intégrer ces composants dans la prochaine itération
-// import CustomerSelectModal from '../components/pos/CustomerSelectModal';
-// import CashPaymentModal from '../components/pos/CashPaymentModal';
-// import ReceiptModal from '../components/pos/ReceiptModal';
-// import SalesHistoryPanel from '../components/pos/SalesHistoryPanel';
+import CustomerSelectModal from '../components/pos/CustomerSelectModal';
+import CashPaymentModal from '../components/pos/CashPaymentModal';
+import ReceiptModal from '../components/pos/ReceiptModal';
+import SalesHistoryPanel from '../components/pos/SalesHistoryPanel';
 
 interface Product {
   id: string;
@@ -48,16 +53,15 @@ const CUSTOMER_TYPES: CustomerType[] = [
   { code: 'WHOLESALE', name: 'Grossiste' },
 ];
 
-// TODO: Interface Customer pour prochaine itération
-// interface Customer {
-//   id: string;
-//   name: string;
-//   email: string | null;
-//   phone: string;
-//   customer_type: string;
-//   credit_limit: number;
-//   current_balance: number;
-// }
+interface Customer {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string;
+  customer_type: string;
+  credit_limit: number;
+  current_balance: number;
+}
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -78,16 +82,16 @@ export default function POS() {
   const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
   const [editPrice, setEditPrice] = useState<string>('');
 
-  // TODO: États pour fonctionnalités avancées (prochaine itération)
-  // const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  // const [showCustomerModal, setShowCustomerModal] = useState(false);
-  // const [discountType, setDiscountType] = useState<'NONE' | 'PERCENTAGE' | 'FIXED'>('NONE');
-  // const [discountValue, setDiscountValue] = useState<number>(0);
-  // const [showCashModal, setShowCashModal] = useState(false);
-  // const [showReceiptModal, setShowReceiptModal] = useState(false);
-  // const [lastSale, setLastSale] = useState<any>(null);
-  // const [activeView, setActiveView] = useState<'pos' | 'history'>('pos');
-  // const [dailyStats, setDailyStats] = useState({ sales: 0, revenue: 0, items: 0 });
+  // États pour fonctionnalités avancées
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [discountType, setDiscountType] = useState<'NONE' | 'PERCENTAGE' | 'FIXED'>('NONE');
+  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [lastSale, setLastSale] = useState<any>(null);
+  const [activeView, setActiveView] = useState<'pos' | 'history'>('pos');
+  const [dailyStats, setDailyStats] = useState({ sales: 0, revenue: 0, items: 0 });
 
   useEffect(() => {
     loadData();
@@ -109,6 +113,27 @@ export default function POS() {
       
       if (shop?.id) {
         setCurrentShop(shop);
+        
+        // Charger les stats quotidiennes
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const { data: salesData } = await supabase
+          .from('sales')
+          .select('total_amount, sale_items(quantity)')
+          .eq('shop_id', shop.id)
+          .gte('created_at', today.toISOString());
+        
+        const revenue = salesData?.reduce((sum: any, s: any) => sum + s.total_amount, 0) || 0;
+        const items = salesData?.reduce((sum: any, s: any) => {
+          const count = s.sale_items?.reduce((s: number, i: any) => s + i.quantity, 0) || 0;
+          return sum + count;
+        }, 0) || 0;
+        
+        setDailyStats({
+          sales: salesData?.length || 0,
+          revenue,
+          items,
+        });
 
         const { data: productsData } = await supabase
           .from('products')
@@ -264,26 +289,115 @@ export default function POS() {
     setCart(cart.filter(item => item.product.id !== productId));
   }
 
-  async function processPayment(paymentMethod: string) {
+  async function loadDailyStats() {
+    if (!currentShop) return;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data } = await supabase
+      .from('sales')
+      .select('total_amount, sale_items(quantity)')
+      .eq('shop_id', currentShop.id)
+      .gte('created_at', today.toISOString());
+
+    const revenue = data?.reduce((sum: any, s: any) => sum + s.total_amount, 0) || 0;
+    const items = data?.reduce((sum: any, s: any) => {
+      const count = s.sale_items?.reduce((s: number, i: any) => s + i.quantity, 0) || 0;
+      return sum + count;
+    }, 0) || 0;
+
+    setDailyStats({
+      sales: data?.length || 0,
+      revenue,
+      items,
+    });
+  }
+
+  function handlePaymentMethodSelect(method: string, amountReceived?: number) {
+    // Validation crédit
+    if (method === 'credit' && !selectedCustomer) {
+      alert('⚠️ Veuillez sélectionner un client pour le paiement à crédit');
+      return;
+    }
+    
+    if (method === 'credit' && selectedCustomer) {
+      const newBalance = selectedCustomer.current_balance + totalAmount;
+      if (newBalance > selectedCustomer.credit_limit) {
+        alert(`❌ Limite crédit dépassée !\n\nActuel: ${selectedCustomer.current_balance.toLocaleString()} FCFA\nLimite: ${selectedCustomer.credit_limit.toLocaleString()} FCFA\nNouveau total: ${newBalance.toLocaleString()} FCFA`);
+        return;
+      }
+    }
+    
+    // Espèces → Modal rendu monnaie
+    if (method === 'cash' && !amountReceived) {
+      setShowPaymentModal(false);
+      setShowCashModal(true);
+    } else {
+      processPayment(method, amountReceived);
+    }
+  }
+
+  function handleCashConfirm(amountReceived: number) {
+    setShowCashModal(false);
+    handlePaymentMethodSelect('cash', amountReceived);
+  }
+
+  async function loadSaleAndShowReceipt(saleId: string) {
+    try {
+      const { data: sale } = await supabase
+        .from('sales')
+        .select(`
+          *,
+          customer:customers(name),
+          sale_items(*, product:products(name))
+        `)
+        .eq('id', saleId)
+        .single();
+      
+      if (sale) {
+        setLastSale({
+          ...sale,
+          items: sale.sale_items?.map((item: any) => ({
+            product_name: item.product.name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            subtotal: item.subtotal,
+          })),
+        });
+        setShowReceiptModal(true);
+      }
+    } catch (error) {
+      console.error('Error loading sale:', error);
+      alert('Erreur lors du chargement de la vente');
+    }
+  }
+
+  async function processPayment(paymentMethod: string, amountReceived?: number) {
     if (cart.length === 0 || !currentShop) return;
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
-
-      // ✅ CORRECTION 1: Créer la vente
+      // Créer la vente avec tous les nouveaux champs
       const { data: saleData, error: saleError } = await supabase
         .from('sales')
         .insert([
           {
             shop_id: currentShop.id,
-            total_amount: total,
+            customer_id: selectedCustomer?.id || null,
+            total_amount: totalAmount,
             payment_method: paymentMethod,
             customer_type: customerType,
             status: 'completed',
-            // customer_id: à ajouter quand fonctionnalité client sera implémentée
+            subtotal_before_discount: subtotal,
+            discount_type: discountType,
+            discount_value: discountValue,
+            discount_amount: discountAmount,
+            amount_received: amountReceived || null,
+            change_amount: amountReceived ? (amountReceived - totalAmount) : null,
+            // ticket_number généré automatiquement par trigger
           },
         ])
         .select()
@@ -341,15 +455,53 @@ export default function POS() {
             quantity: -item.quantity,
             reference_type: 'SALE',
             reference_id: saleData.id,
-            notes: `Vente ticket #${saleData.id}`,
+            notes: `Vente ticket ${saleData.ticket_number || saleData.id}`,
             created_by: user.id,
           }]);
       }
 
-      alert(`✅ Vente enregistrée avec succès !\nTicket: ${saleData.id}\nTotal: ${total.toLocaleString()} FCFA`);
+      // Si crédit, mettre à jour customer_credit_history
+      if (paymentMethod === 'credit' && selectedCustomer) {
+        await supabase.from('customer_credit_history').insert([{
+          customer_id: selectedCustomer.id,
+          sale_id: saleData.id,
+          amount: totalAmount,
+          type: 'CREDIT',
+          balance_before: selectedCustomer.current_balance,
+          balance_after: selectedCustomer.current_balance + totalAmount,
+        }]);
+        
+        // Mettre à jour current_balance du client
+        await supabase
+          .from('customers')
+          .update({ 
+            current_balance: selectedCustomer.current_balance + totalAmount 
+          })
+          .eq('id', selectedCustomer.id);
+      }
+
+      // Préparer données reçu
+      setLastSale({
+        ...saleData,
+        customer: selectedCustomer ? { name: selectedCustomer.name } : null,
+        items: cart.map(item => ({
+          product_name: item.product.name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          subtotal: item.subtotal,
+        })),
+      });
+
+      // Reset et afficher reçu
       setCart([]);
+      setDiscountType('NONE');
+      setDiscountValue(0);
+      setSelectedCustomer(null);
       setShowPaymentModal(false);
-      loadData(); // Recharger produits pour mettre à jour stock
+      setShowReceiptModal(true);
+      
+      await loadDailyStats(); // Recharger stats
+      await loadData(); // Recharger produits
     } catch (error: any) {
       console.error('Error processing payment:', error);
       alert(`❌ Erreur lors du paiement: ${error.message}`);
@@ -361,15 +513,13 @@ export default function POS() {
     p.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Calculs panier (remise désactivée temporairement)
-  const totalAmount = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  // Calculs panier avec remise
+  const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  const discountAmount = discountType === 'PERCENTAGE' 
+    ? (subtotal * discountValue) / 100
+    : discountType === 'FIXED' ? discountValue : 0;
+  const totalAmount = Math.max(0, subtotal - discountAmount);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-  // TODO: Réactiver remise dans prochaine itération
-  // const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-  // const discountAmount = discountType === 'PERCENTAGE' 
-  //   ? (subtotal * discountValue) / 100
-  //   : discountType === 'FIXED' ? discountValue : 0;
-  // const totalAmount = Math.max(0, subtotal - discountAmount);
 
   if (loading) {
     return (
@@ -386,12 +536,48 @@ export default function POS() {
     <div className="h-full flex flex-col bg-gray-50">
       {/* Header avec Type de Client */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Point de Vente</h1>
             <p className="text-sm text-gray-600">{currentShop?.name}</p>
           </div>
           
+          {/* Stats Quotidiennes */}
+          <div className="flex gap-6">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-green-600" />
+              <span className="text-sm text-gray-600">CA:</span>
+              <span className="font-semibold text-green-600">
+                {dailyStats.revenue.toLocaleString()} FCFA
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-blue-600" />
+              <span className="text-sm text-gray-600">Ventes:</span>
+              <span className="font-semibold text-blue-600">{dailyStats.sales}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-purple-600" />
+              <span className="text-sm text-gray-600">Articles:</span>
+              <span className="font-semibold text-purple-600">{dailyStats.items}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          {/* Sélecteur Client */}
+          <button
+            onClick={() => setShowCustomerModal(true)}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+          >
+            <User className="w-5 h-5" />
+            {selectedCustomer ? (
+              <span>{selectedCustomer.name}</span>
+            ) : (
+              <span className="text-gray-600">Sélectionner Client</span>
+            )}
+          </button>
+
           {/* Sélecteur Type de Client */}
           <div className="flex items-center gap-3">
             <Users className="w-5 h-5 text-gray-500" />
@@ -414,9 +600,35 @@ export default function POS() {
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Products Grid */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Onglets Vue */}
+      <div className="flex gap-2 p-4 bg-white border-b border-gray-200">
+        <button
+          onClick={() => setActiveView('pos')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            activeView === 'pos'
+              ? 'bg-primary text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          Point de Vente
+        </button>
+        <button
+          onClick={() => setActiveView('history')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+            activeView === 'history'
+              ? 'bg-primary text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          Historique
+        </button>
+      </div>
+
+      {activeView === 'pos' ? (
+        <div className="flex-1 flex overflow-hidden">
+          {/* Products Grid */}
+          <div className="flex-1 flex flex-col overflow-hidden">
           {/* Search */}
           <div className="p-4 bg-white border-b border-gray-200">
             <div className="relative">
@@ -535,7 +747,58 @@ export default function POS() {
             )}
           </div>
 
-          <div className="p-4 border-t border-gray-200 space-y-3">
+          {/* Section Remise */}
+          {cart.length > 0 && (
+            <div className="p-4 border-t border-gray-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Tag className="w-4 h-4" />
+                  Remise
+                </span>
+                <select 
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as any)}
+                  className="text-sm border border-gray-300 rounded px-2 py-1"
+                >
+                  <option value="NONE">Aucune</option>
+                  <option value="PERCENTAGE">Pourcentage (%)</option>
+                  <option value="FIXED">Montant Fixe</option>
+                </select>
+              </div>
+              
+              {discountType !== 'NONE' && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder={discountType === 'PERCENTAGE' ? 'Ex: 10' : 'Ex: 5000'}
+                    min="0"
+                    step={discountType === 'PERCENTAGE' ? '1' : '1000'}
+                  />
+                  <span className="text-sm text-gray-600">
+                    {discountType === 'PERCENTAGE' ? '%' : 'FCFA'}
+                  </span>
+                </div>
+              )}
+              
+              {discountAmount > 0 && (
+                <div className="flex items-center justify-between text-green-600 font-medium text-sm">
+                  <span>Remise appliquée</span>
+                  <span>-{discountAmount.toLocaleString()} FCFA</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="p-4 border-t border-gray-200 space-y-2">
+            {discountAmount > 0 && (
+              <div className="flex items-center justify-between text-sm text-gray-600">
+                <span>Sous-total</span>
+                <span>{subtotal.toLocaleString()} FCFA</span>
+              </div>
+            )}
             <div className="flex items-center justify-between text-xl font-bold">
               <span>Total</span>
               <span className="text-primary">{totalAmount.toLocaleString()} FCFA</span>
@@ -551,6 +814,19 @@ export default function POS() {
           </div>
         </div>
       </div>
+      ) : (
+        /* Vue Historique */
+        <div className="p-6">
+          <SalesHistoryPanel
+            shopId={currentShop.id}
+            onViewReceipt={(saleId) => loadSaleAndShowReceipt(saleId)}
+            onRefund={(_saleId) => {
+              // TODO: Implémenter remboursement
+              alert('Remboursement à implémenter');
+            }}
+          />
+        </div>
+      )}
 
       {/* Modal Saisie Prix */}
       {showPriceModal && selectedProduct && (
@@ -727,27 +1003,26 @@ export default function POS() {
 
             <div className="space-y-3">
               <button
-                onClick={() => processPayment('cash')}
+                onClick={() => handlePaymentMethodSelect('cash')}
                 className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
                 💵 Espèces
               </button>
               <button
-                onClick={() => processPayment('mobile_money')}
+                onClick={() => handlePaymentMethodSelect('mobile_money')}
                 className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
                 📱 Mobile Money
               </button>
               <button
-                onClick={() => processPayment('card')}
+                onClick={() => handlePaymentMethodSelect('card')}
                 className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
               >
                 💳 Carte Bancaire
               </button>
               <button
-                onClick={() => processPayment('credit')}
+                onClick={() => handlePaymentMethodSelect('credit')}
                 className="w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
-                title="À implémenter avec sélection client"
               >
                 💰 À Crédit (Client)
               </button>
@@ -760,6 +1035,44 @@ export default function POS() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Sélection Client */}
+      {showCustomerModal && (
+        <CustomerSelectModal
+          onClose={() => setShowCustomerModal(false)}
+          onSelect={(customer) => setSelectedCustomer(customer)}
+          selectedCustomer={selectedCustomer}
+        />
+      )}
+
+      {/* Modal Paiement Espèces */}
+      {showCashModal && (
+        <CashPaymentModal
+          totalAmount={totalAmount}
+          onClose={() => setShowCashModal(false)}
+          onConfirm={handleCashConfirm}
+        />
+      )}
+
+      {/* Modal Reçu */}
+      {showReceiptModal && lastSale && (
+        <ReceiptModal
+          ticketNumber={lastSale.ticket_number}
+          date={lastSale.created_at}
+          shopName={currentShop.name}
+          shopAddress={currentShop.address}
+          shopPhone={currentShop.phone}
+          customerName={lastSale.customer?.name}
+          items={lastSale.items}
+          subtotal={lastSale.subtotal_before_discount || lastSale.total_amount}
+          discount={lastSale.discount_amount || 0}
+          total={lastSale.total_amount}
+          paymentMethod={lastSale.payment_method}
+          amountReceived={lastSale.amount_received}
+          change={lastSale.change_amount}
+          onClose={() => setShowReceiptModal(false)}
+        />
       )}
     </div>
   );
