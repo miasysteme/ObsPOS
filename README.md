@@ -1,6 +1,6 @@
 # PhonesPOS - Plateforme SaaS Multi-tenant
 
-[![Deploy Admin](https://github.com/[votre-username]/ObsPOS/actions/workflows/deploy-admin.yml/badge.svg)](https://github.com/[votre-username]/ObsPOS/actions/workflows/deploy-admin.yml)
+[![Deploy Admin](https://github.com/miasysteme/ObsPOS/actions/workflows/deploy-admin.yml/badge.svg)](https://github.com/miasysteme/ObsPOS/actions/workflows/deploy-admin.yml)
 [![Production](https://img.shields.io/badge/Production-Live-success?style=flat&logo=vercel)](https://obs-systeme.store)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
