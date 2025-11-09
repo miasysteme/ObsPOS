@@ -14,9 +14,11 @@ function App() {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
+          setLoading(true);
           const adminStatus = await isSuperAdmin();
           setIsAdmin(adminStatus);
-          setIsAuthenticated(adminStatus);
+          setIsAuthenticated(true);
+          setLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setIsAuthenticated(false);
           setIsAdmin(false);
@@ -31,15 +33,26 @@ function App() {
 
   async function checkAuth() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      setLoading(true);
+      
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw sessionError;
+      }
       
       if (session) {
         const adminStatus = await isSuperAdmin();
         setIsAdmin(adminStatus);
-        setIsAuthenticated(adminStatus);
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+        setIsAdmin(false);
       }
     } catch (error) {
       console.error('Auth error:', error);
+      setIsAuthenticated(false);
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -56,8 +69,30 @@ function App() {
     );
   }
 
-  if (!isAuthenticated || !isAdmin) {
+  if (!isAuthenticated) {
     return <LoginPage onLogin={() => checkAuth()} />;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md p-6 bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
+            <p className="font-medium">Accès refusé</p>
+            <p className="text-sm mt-2">Vous n'avez pas les permissions nécessaires pour accéder à cette application d'administration.</p>
+          </div>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.reload();
+            }}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+          >
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return <Dashboard />;
