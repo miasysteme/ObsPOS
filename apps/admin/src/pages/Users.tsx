@@ -477,7 +477,6 @@ function UserModal({ user, establishments, shops, onClose, onSave }: any) {
   const [formData, setFormData] = useState({
     email: user?.email || '',
     full_name: user?.full_name || '',
-    phone: user?.phone || '',
     role: user?.role || 'cashier',
     tenant_id: user?.tenant_id || '',
     shop_id: user?.shop_id || '',
@@ -501,7 +500,6 @@ function UserModal({ user, establishments, shops, onClose, onSave }: any) {
         // Update existing user
         const updateData: any = {
           full_name: formData.full_name,
-          phone: formData.phone,
           role: formData.role,
           tenant_id: formData.tenant_id || null,
           shop_id: formData.shop_id || null,
@@ -550,7 +548,6 @@ function UserModal({ user, establishments, shops, onClose, onSave }: any) {
             id: authData.user.id,
             email: formData.email,
             full_name: formData.full_name,
-            phone: formData.phone,
             role: formData.role,
             tenant_id: formData.tenant_id || null,
             shop_id: formData.shop_id || null,
@@ -559,13 +556,19 @@ function UserModal({ user, establishments, shops, onClose, onSave }: any) {
             onConflict: 'id',
           });
 
-        if (upsertError) throw upsertError;
+        if (upsertError) {
+          console.error('Upsert error details:', upsertError);
+          throw new Error(`Erreur création utilisateur: ${upsertError.message}`);
+        }
       }
 
+      alert('✅ Utilisateur créé avec succès !');
       onSave();
     } catch (error: any) {
       console.error('Error saving user:', error);
-      setError(error.message || 'Erreur lors de l\'enregistrement');
+      const errorMsg = error.message || 'Erreur lors de l\'enregistrement';
+      setError(errorMsg);
+      alert(`❌ Erreur: ${errorMsg}`);
     } finally {
       setSaving(false);
     }
@@ -619,19 +622,6 @@ function UserModal({ user, establishments, shops, onClose, onSave }: any) {
               {user && (
                 <p className="text-xs text-gray-500 mt-1">L'email ne peut pas être modifié</p>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Téléphone
-              </label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="+221 77 123 45 67"
-              />
             </div>
 
             {!user && (
