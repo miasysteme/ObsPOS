@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, getUserRole } from '../lib/supabase';
 import {
   Package,
   Plus,
@@ -12,6 +12,7 @@ import {
   Box,
   TrendingDown,
   FileSpreadsheet,
+  X,
 } from 'lucide-react';
 import ProductModal from '../components/products/ProductModal';
 import CategoryModal from '../components/products/CategoryModal';
@@ -61,6 +62,11 @@ export default function Products() {
   const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [roleInfo, setRoleInfo] = useState<{ role?: string; tenant_id?: string; shop_id?: string } | null>(null);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [bulkDeleteScope, setBulkDeleteScope] = useState<'tenant' | 'shop'>('shop');
+  const [selectedShopForDelete, setSelectedShopForDelete] = useState<string>('');
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -70,49 +76,101 @@ export default function Products() {
     try {
       setLoading(true);
 
+      const roleData = await getUserRole();
+      setRoleInfo(roleData);
+      const tenantId = roleData?.tenant_id;
+      const role = roleData?.role;
+      const isSuperAdmin = role === 'super_admin';
+
+      if (!roleData) {
+        setProducts([]);
+        setCategories([]);
+        setShops([]);
+        return;
+      }
+
       const { data: categoriesData } = await supabase
         .from('categories')
         .select('*')
         .order('name');
       setCategories(categoriesData || []);
 
-      const { data: shopsData } = await supabase
+      let shopsQuery = supabase
         .from('shops')
-        .select('id, name')
+        .select('id, name, tenant_id')
         .order('name');
-      setShops(shopsData || []);
 
-      const { data: productsData, error } = await supabase
+      if (!isSuperAdmin && tenantId) {
+        shopsQuery = shopsQuery.eq('tenant_id', tenantId);
+      }
+
+      const { data: shopsData } = await shopsQuery;
+      const simplifiedShops = (shopsData || []).map((shop: any) => ({ id: shop.id, name: shop.name }));
+      setShops(simplifiedShops);
+      setSelectedShopForDelete((prev) => prev || simplifiedShops[0]?.id || '');
+
+      let productsQuery = supabase
         .from('products')
         .select(`*, category:categories(name)`)
         .order('created_at', { ascending: false });
 
+      if (!isSuperAdmin && tenantId) {
+        productsQuery = productsQuery.eq('tenant_id', tenantId);
+      }
+
+      const { data: productsData, error } = await productsQuery;
+
       if (error) throw error;
 
-      if (!productsData || !Array.isArray(productsData)) {
+      if (!productsData || !Array.isArray(productsData) || productsData.length === 0) {
         setProducts([]);
         return;
       }
 
-      const productsWithStock = await Promise.all(
-        productsData.map(async (product: any) => {
-          const { data: inventoryData } = await supabase
-            .from('inventory')
-            .select('quantity, shop_id')
-            .eq('product_id', product.id);
+      const productIds = productsData
+        .map((product: any) => product.id)
+        .filter((id: string | null | undefined) => typeof id === 'string');
 
-          const totalStock = inventoryData?.reduce((sum, inv) => sum + inv.quantity, 0) || 0;
-          const lowStockCount = inventoryData?.filter(
-            inv => inv.quantity < product.min_stock_level
-          ).length || 0;
+      if (productIds.length === 0) {
+        setProducts([]);
+        return;
+      }
 
-          return {
-            ...product,
-            total_stock: totalStock,
-            low_stock_count: lowStockCount,
-          };
-        })
-      );
+      let inventoryQuery = supabase
+        .from('inventory')
+        .select('product_id, quantity, shop_id')
+        .in('product_id', productIds);
+
+      if (!isSuperAdmin && simplifiedShops.length > 0) {
+        const tenantShopIds = simplifiedShops.map((shop) => shop.id);
+        inventoryQuery = inventoryQuery.in('shop_id', tenantShopIds);
+      }
+
+      const { data: inventoryRows, error: inventoryError } = await inventoryQuery;
+
+      if (inventoryError) throw inventoryError;
+
+      const inventoryByProduct = new Map<string, { total: number; quantities: number[] }>();
+      inventoryRows?.forEach((row: any) => {
+        const existing = inventoryByProduct.get(row.product_id) || { total: 0, quantities: [] };
+        const quantity = row.quantity || 0;
+        inventoryByProduct.set(row.product_id, {
+          total: existing.total + quantity,
+          quantities: [...existing.quantities, quantity],
+        });
+      });
+
+      const productsWithStock = productsData.map((product: any) => {
+        const inventoryInfo = inventoryByProduct.get(product.id) || { total: 0, quantities: [] };
+        const minStockLevel = product.min_stock_level || 0;
+        const lowStockCount = inventoryInfo.quantities.filter((qty) => qty < minStockLevel).length;
+
+        return {
+          ...product,
+          total_stock: inventoryInfo.total,
+          low_stock_count: lowStockCount,
+        };
+      });
 
       setProducts(productsWithStock);
     } catch (error) {
@@ -171,6 +229,61 @@ export default function Products() {
     inactive: products.filter((p) => !p.is_active).length,
     lowStock: products.filter((p) => (p.low_stock_count || 0) > 0).length,
   };
+
+  const canBulkDelete = !!roleInfo && ['super_admin', 'owner', 'admin', 'manager'].includes(roleInfo.role || '');
+
+  useEffect(() => {
+    if (!selectedShopForDelete && shops.length > 0) {
+      setSelectedShopForDelete(shops[0].id);
+    }
+  }, [shops, selectedShopForDelete]);
+
+  function openBulkDeleteModal() {
+    setBulkDeleteScope('shop');
+    setShowBulkDeleteModal(true);
+  }
+
+  async function handleBulkDelete() {
+    if (!roleInfo?.tenant_id) {
+      alert("Impossible de déterminer l'établissement pour la suppression");
+      return;
+    }
+
+    const deleteAll = bulkDeleteScope === 'tenant';
+    if (!deleteAll && !selectedShopForDelete) {
+      alert('Veuillez sélectionner une boutique');
+      return;
+    }
+
+    const confirmationMessage = deleteAll
+      ? "Cette action supprimera définitivement tous les produits de l'établissement. Confirmez-vous ?"
+      : 'Cette action supprimera définitivement tous les produits de la boutique sélectionnée. Confirmez-vous ?';
+
+    if (!confirm(confirmationMessage)) {
+      return;
+    }
+
+    try {
+      setBulkDeleting(true);
+      const { data, error } = await supabase.rpc('delete_products_bulk', {
+        target_tenant_id: roleInfo.tenant_id,
+        target_shop_id: deleteAll ? null : selectedShopForDelete,
+        delete_all_shops: deleteAll,
+      });
+
+      if (error) throw error;
+
+      const deletedCount = data || 0;
+      await loadData();
+      setShowBulkDeleteModal(false);
+      alert(`${deletedCount} produit${deletedCount > 1 ? 's' : ''} supprimé${deletedCount > 1 ? 's' : ''}.`);
+    } catch (error: any) {
+      console.error('Error deleting products in bulk:', error);
+      alert(`Erreur lors de la suppression en lot: ${error.message || error}`);
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -305,6 +418,16 @@ export default function Products() {
             <Plus className="w-4 h-4" />
             Ajouter un produit
           </button>
+
+          {canBulkDelete && (
+            <button
+              onClick={openBulkDeleteModal}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Supprimer en lot
+            </button>
+          )}
         </div>
       </div>
 
@@ -437,8 +560,94 @@ export default function Products() {
         <ImportExportModal
           shops={shops}
           onClose={() => setShowImportExportModal(false)}
-          onImportComplete={() => { setShowImportExportModal(false); loadData(); }}
+          onImportComplete={loadData}
         />
+      )}
+
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">Suppression en lot</h3>
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-3">Portée de la suppression</p>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="bulk-delete-scope"
+                      value="shop"
+                      checked={bulkDeleteScope === 'shop'}
+                      onChange={() => setBulkDeleteScope('shop')}
+                      className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                    />
+                    <span className="text-sm text-gray-700">Supprimer les produits d'une boutique spécifique</span>
+                  </label>
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="bulk-delete-scope"
+                      value="tenant"
+                      checked={bulkDeleteScope === 'tenant'}
+                      onChange={() => setBulkDeleteScope('tenant')}
+                      className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                    />
+                    <span className="text-sm text-gray-700">Supprimer tous les produits de l'établissement</span>
+                  </label>
+                </div>
+              </div>
+
+              {bulkDeleteScope === 'shop' && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Choisir la boutique</p>
+                  <select
+                    value={selectedShopForDelete}
+                    onChange={(e) => setSelectedShopForDelete(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    {shops.length === 0 && <option value="">Aucune boutique disponible</option>}
+                    {shops.map((shop) => (
+                      <option key={shop.id} value={shop.id}>
+                        {shop.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-4">
+                <p className="font-semibold mb-1">Attention</p>
+                <p>Cette action est irréversible. Les produits supprimés seront retirés des stocks et des ventes associées.</p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                disabled={bulkDeleting}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting || (bulkDeleteScope === 'shop' && !selectedShopForDelete)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {bulkDeleting ? 'Suppression...' : 'Confirmer la suppression'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
