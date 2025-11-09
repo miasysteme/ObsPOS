@@ -55,6 +55,27 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
         return;
       }
 
+      // Récupérer les quantités en stock pour chaque produit
+      const productIds = products.map(p => p.id);
+      let inventoryQuery = supabase
+        .from('inventory')
+        .select('product_id, shop_id, quantity')
+        .in('product_id', productIds);
+
+      // Si une boutique est sélectionnée, filtrer par cette boutique
+      if (selectedShopId) {
+        inventoryQuery = inventoryQuery.eq('shop_id', selectedShopId);
+      }
+
+      const { data: inventoryData } = await inventoryQuery;
+      
+      // Créer un map des quantités par produit (et boutique si sélectionnée)
+      const stockMap = new Map<string, number>();
+      inventoryData?.forEach(inv => {
+        const key = selectedShopId ? inv.product_id : `${inv.product_id}_${inv.shop_id}`;
+        stockMap.set(key, (stockMap.get(key) || 0) + inv.quantity);
+      });
+
       // Créer le CSV avec tous les champs
       const headers = [
         'SKU',
@@ -63,6 +84,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
         'Description',
         'Catégorie',
         'Boutique',
+        'Quantité en stock',
         'Marque',
         'Modèle',
         'Capacité',
@@ -81,28 +103,34 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
 
       const csvRows = [
         headers.join(','),
-        ...products.map(p => [
-          p.sku || '',
-          p.barcode || '',
-          `"${p.name || ''}"`,
-          `"${(p.description || '').replace(/"/g, '""')}"`,
-          `"${(p as any).category?.name || ''}"`,
-          `"${(p as any).shop?.name || ''}"`,
-          `"${p.brand || ''}"`,
-          `"${p.model || ''}"`,
-          `"${p.capacity || ''}"`,
-          `"${p.color || ''}"`,
-          `"${p.size || ''}"`,
-          p.weight || '',
-          p.expiry_date || '',
-          p.base_price || 0,
-          p.cost_price || 0,
-          p.retail_price || '',
-          p.semi_wholesale_price || '',
-          p.wholesale_price || '',
-          p.min_stock_level || 5,
-          p.is_active ? 'Oui' : 'Non'
-        ].join(','))
+        ...products.map(p => {
+          const stockKey = selectedShopId ? p.id : `${p.id}_${p.shop_id}`;
+          const quantity = stockMap.get(stockKey) || 0;
+          
+          return [
+            p.sku || '',
+            p.barcode || '',
+            `"${p.name || ''}"`,
+            `"${(p.description || '').replace(/"/g, '""')}"`,
+            `"${(p as any).category?.name || ''}"`,
+            `"${(p as any).shop?.name || ''}"`,
+            quantity,
+            `"${p.brand || ''}"`,
+            `"${p.model || ''}"`,
+            `"${p.capacity || ''}"`,
+            `"${p.color || ''}"`,
+            `"${p.size || ''}"`,
+            p.weight || '',
+            p.expiry_date || '',
+            p.base_price || 0,
+            p.cost_price || 0,
+            p.retail_price || '',
+            p.semi_wholesale_price || '',
+            p.wholesale_price || '',
+            p.min_stock_level || 5,
+            p.is_active ? 'Oui' : 'Non'
+          ].join(',');
+        })
       ];
 
       const csvContent = csvRows.join('\n');
@@ -174,7 +202,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
 
         try {
           const [
-            sku, barcode, name, description, categoryName, _shopName,
+            sku, barcode, name, description, categoryName, _shopName, quantity,
             brand, model, capacity, color, size, weight, expiryDate,
             basePrice, costPrice, retailPrice, semiWholesalePrice, wholesalePrice,
             minStock, isActive
@@ -185,15 +213,22 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
             continue;
           }
 
+          if (!selectedShopId) {
+            errors.push({ row: i + 1, message: 'Boutique requise pour import' });
+            continue;
+          }
+
           const categoryId = categoryName ? categoryMap.get(categoryName.toLowerCase()) : null;
+          const skuValue = sku || `SKU-${Date.now()}-${i}`;
+          const quantityValue = quantity ? parseInt(quantity) : 0;
 
           const productData: any = {
-            sku: sku || `SKU-${Date.now()}-${i}`,
+            sku: skuValue,
             barcode: barcode || '',
             name,
             description: description || '',
             category_id: categoryId || null,
-            shop_id: selectedShopId || null,
+            shop_id: selectedShopId,
             brand: brand || null,
             model: model || null,
             capacity: capacity || null,
@@ -211,15 +246,97 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
             tenant_id: userData?.tenant_id || null,
           };
 
-          const { error } = await supabase
+          // Vérifier si le produit existe déjà (par SKU)
+          const { data: existingProduct } = await supabase
             .from('products')
-            .insert([productData]);
+            .select('id')
+            .eq('sku', skuValue)
+            .maybeSingle();
 
-          if (error) {
-            errors.push({ row: i + 1, message: error.message });
+          let productId: string;
+
+          if (existingProduct) {
+            // Produit existe - mettre à jour
+            const { error: updateError } = await supabase
+              .from('products')
+              .update(productData)
+              .eq('id', existingProduct.id);
+
+            if (updateError) {
+              errors.push({ row: i + 1, message: `Mise à jour: ${updateError.message}` });
+              continue;
+            }
+            productId = existingProduct.id;
           } else {
-            success++;
+            // Nouveau produit - créer
+            const { data: newProduct, error: insertError } = await supabase
+              .from('products')
+              .insert([productData])
+              .select('id')
+              .single();
+
+            if (insertError || !newProduct) {
+              errors.push({ row: i + 1, message: `Création: ${insertError?.message || 'Erreur'}` });
+              continue;
+            }
+            productId = newProduct.id;
           }
+
+          // Gérer le stock dans inventory (ADDITION)
+          if (quantityValue > 0) {
+            // Vérifier si une entrée inventory existe
+            const { data: existingInventory } = await supabase
+              .from('inventory')
+              .select('quantity')
+              .eq('shop_id', selectedShopId)
+              .eq('product_id', productId)
+              .maybeSingle();
+
+            if (existingInventory) {
+              // Additionner au stock existant
+              const newQuantity = existingInventory.quantity + quantityValue;
+              const { error: invError } = await supabase
+                .from('inventory')
+                .update({ quantity: newQuantity })
+                .eq('shop_id', selectedShopId)
+                .eq('product_id', productId);
+
+              if (invError) {
+                errors.push({ row: i + 1, message: `Stock: ${invError.message}` });
+                continue;
+              }
+            } else {
+              // Créer nouvelle entrée inventory
+              const { error: invError } = await supabase
+                .from('inventory')
+                .insert([{
+                  shop_id: selectedShopId,
+                  product_id: productId,
+                  quantity: quantityValue,
+                }]);
+
+              if (invError) {
+                errors.push({ row: i + 1, message: `Stock: ${invError.message}` });
+                continue;
+              }
+            }
+
+            // Créer un mouvement de stock
+            await supabase
+              .from('stock_movements')
+              .insert([{
+                shop_id: selectedShopId,
+                product_id: productId,
+                movement_type: 'IMPORT',
+                quantity: quantityValue,
+                reference_type: 'CSV_IMPORT',
+                reference_id: null,
+                notes: `Import CSV ${new Date().toISOString().split('T')[0]}`,
+                created_by: user.id,
+              }]);
+          }
+
+          success++;
         } catch (error: any) {
           errors.push({ row: i + 1, message: error.message || 'Erreur inconnue' });
         }
@@ -275,6 +392,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
       'Description',
       'Catégorie',
       'Boutique',
+      'Quantité en stock',
       'Marque',
       'Modèle',
       'Capacité',
@@ -298,6 +416,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
       'Dernier modèle Apple avec écran 6.7 pouces',
       'SMARTPHONES',
       '',
+      '50',
       'Apple',
       'iPhone 14 Pro Max',
       '256GB',
@@ -453,10 +572,16 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
                     </label>
                   </div>
                   <div className="text-xs text-gray-500 space-y-1">
-                    <p><strong>Format attendu :</strong> SKU, Code-barre, Nom, Description, Catégorie, Boutique, Marque, Modèle, Capacité, Couleur, Taille, Poids, Date péremption, Prix base, Prix achat, Prix Particulier, Prix Demi-Grossiste, Prix Grossiste, Stock min, Actif</p>
+                    <p><strong>Format attendu :</strong> SKU, Code-barre, Nom, Description, Catégorie, Boutique, <span className="text-green-600 font-semibold">Quantité en stock</span>, Marque, Modèle, Capacité, Couleur, Taille, Poids, Date péremption, Prix base, Prix achat, Prix Particulier, Prix Demi-Grossiste, Prix Grossiste, Stock min, Actif</p>
+                    <p><strong>Logique d'import :</strong></p>
+                    <ul className="list-disc list-inside pl-2 space-y-1">
+                      <li>Si le <strong>SKU existe déjà</strong> : mise à jour du produit + <span className="text-green-600 font-semibold">addition de la quantité</span> au stock existant</li>
+                      <li>Si le <strong>SKU est nouveau</strong> : création du produit + création du stock initial</li>
+                      <li>Une <strong>boutique doit être sélectionnée</strong> avant l'import (menu déroulant)</li>
+                    </ul>
                     <p><strong>Encodage :</strong> UTF-8</p>
                     <p><strong>Séparateur :</strong> Virgule (,)</p>
-                    <p><strong>Note :</strong> Tous les champs sauf Nom et Prix de base sont optionnels</p>
+                    <p><strong>Note :</strong> Nom et Prix de base sont obligatoires. La quantité s'additionne automatiquement si le produit existe.</p>
                   </div>
                 </div>
               </div>

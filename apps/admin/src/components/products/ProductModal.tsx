@@ -56,6 +56,7 @@ export default function ProductModal({ product, categories, shops, onClose, onSa
     base_price: product?.base_price || 0,
     cost_price: product?.cost_price || 0,
     min_stock_level: product?.min_stock_level || 5,
+    initial_quantity: 0, // Stock initial uniquement pour création
     is_active: product?.is_active ?? true,
     retail_price: product?.retail_price || 0,
     semi_wholesale_price: product?.semi_wholesale_price || 0,
@@ -112,14 +113,18 @@ export default function ProductModal({ product, categories, shops, onClose, onSa
         .eq('id', user.id)
         .single();
 
+      // Extraire initial_quantity du formData (n'est pas dans la table products)
+      const { initial_quantity, ...productFields } = formData;
+
       const productData = {
-        ...formData,
+        ...productFields,
         image_url: imageUrl || null,
         tenant_id: userData?.tenant_id || null,
         category_id: formData.category_id || null,
       };
 
       if (product) {
+        // Mode édition
         const { error } = await supabase
           .from('products')
           .update(productData)
@@ -130,13 +135,47 @@ export default function ProductModal({ product, categories, shops, onClose, onSa
           throw error;
         }
       } else {
-        const { error } = await supabase
+        // Mode création
+        const { data: newProduct, error } = await supabase
           .from('products')
-          .insert([productData]);
+          .insert([productData])
+          .select('id')
+          .single();
         
         if (error) {
           console.error('Insert error:', error);
           throw error;
+        }
+
+        // Créer le stock initial si quantité > 0 et boutique sélectionnée
+        if (newProduct && initial_quantity > 0 && formData.shop_id) {
+          // Créer l'entrée inventory
+          const { error: invError } = await supabase
+            .from('inventory')
+            .insert([{
+              shop_id: formData.shop_id,
+              product_id: newProduct.id,
+              quantity: initial_quantity,
+            }]);
+
+          if (invError) {
+            console.error('Inventory error:', invError);
+            // Ne pas bloquer la création du produit
+          }
+
+          // Créer un mouvement de stock
+          await supabase
+            .from('stock_movements')
+            .insert([{
+              shop_id: formData.shop_id,
+              product_id: newProduct.id,
+              movement_type: 'INITIAL',
+              quantity: initial_quantity,
+              reference_type: 'PRODUCT_CREATION',
+              reference_id: newProduct.id,
+              notes: 'Stock initial lors de la création du produit',
+              created_by: user.id,
+            }]);
         }
       }
 
@@ -377,6 +416,40 @@ export default function ProductModal({ product, categories, shops, onClose, onSa
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="5" />
             </div>
+
+            {/* Stock initial - uniquement en mode création */}
+            {!product && (
+              <div className="md:col-span-2 p-4 bg-green-50 rounded-lg border border-green-200">
+                <label className="block text-sm font-medium text-green-900 mb-2">
+                  <Package className="w-4 h-4 inline mr-2" />
+                  Stock initial (Optionnel)
+                </label>
+                <div className="flex items-start gap-3">
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={formData.initial_quantity}
+                    onChange={(e) => setFormData({ ...formData, initial_quantity: parseInt(e.target.value) || 0 })}
+                    disabled={!formData.shop_id}
+                    className="flex-1 px-4 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Quantité initiale" 
+                  />
+                  <div className="flex-1">
+                    <p className="text-xs text-green-700">
+                      {formData.shop_id ? (
+                        <>
+                          ✅ Le stock sera créé automatiquement pour la boutique sélectionnée
+                        </>
+                      ) : (
+                        <>
+                          ⚠️ Sélectionnez une boutique pour définir le stock initial
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="md:col-span-2">
               <label className="flex items-center gap-2">
