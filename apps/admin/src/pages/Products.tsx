@@ -46,12 +46,19 @@ interface Product {
 interface Shop {
   id: string;
   name: string;
+  tenant_id?: string | null;
+}
+
+interface Establishment {
+  id: string;
+  name: string;
 }
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
+  const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -66,6 +73,7 @@ export default function Products() {
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [bulkDeleteScope, setBulkDeleteScope] = useState<'tenant' | 'shop'>('shop');
   const [selectedShopForDelete, setSelectedShopForDelete] = useState<string>('');
+  const [selectedEstablishmentForDelete, setSelectedEstablishmentForDelete] = useState<string>('');
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
@@ -86,6 +94,7 @@ export default function Products() {
         setProducts([]);
         setCategories([]);
         setShops([]);
+        setEstablishments([]);
         return;
       }
 
@@ -94,6 +103,17 @@ export default function Products() {
         .select('*')
         .order('name');
       setCategories(categoriesData || []);
+
+      if (isSuperAdmin) {
+        const { data: establishmentsData } = await supabase
+          .from('establishments')
+          .select('id, name')
+          .order('name');
+        setEstablishments(establishmentsData || []);
+        setSelectedEstablishmentForDelete((prev) => prev || establishmentsData?.[0]?.id || '');
+      } else if (tenantId) {
+        setSelectedEstablishmentForDelete(tenantId);
+      }
 
       let shopsQuery = supabase
         .from('shops')
@@ -105,7 +125,7 @@ export default function Products() {
       }
 
       const { data: shopsData } = await shopsQuery;
-      const simplifiedShops = (shopsData || []).map((shop: any) => ({ id: shop.id, name: shop.name }));
+      const simplifiedShops = (shopsData || []).map((shop: any) => ({ id: shop.id, name: shop.name, tenant_id: shop.tenant_id }));
       setShops(simplifiedShops);
       setSelectedShopForDelete((prev) => prev || simplifiedShops[0]?.id || '');
 
@@ -178,6 +198,7 @@ export default function Products() {
       setProducts([]);
       setCategories([]);
       setShops([]);
+      setEstablishments([]);
     } finally {
       setLoading(false);
     }
@@ -231,6 +252,7 @@ export default function Products() {
   };
 
   const canBulkDelete = !!roleInfo && ['super_admin', 'owner', 'admin', 'manager'].includes(roleInfo.role || '');
+  const isSuperAdmin = roleInfo?.role === 'super_admin';
 
   useEffect(() => {
     if (!selectedShopForDelete && shops.length > 0) {
@@ -238,20 +260,52 @@ export default function Products() {
     }
   }, [shops, selectedShopForDelete]);
 
+  useEffect(() => {
+    if (roleInfo?.role === 'super_admin') {
+      const filtered = selectedEstablishmentForDelete
+        ? shops.filter((shop) => shop.tenant_id === selectedEstablishmentForDelete)
+        : shops;
+
+      if (filtered.length === 0) {
+        setSelectedShopForDelete('');
+      } else if (!filtered.some((shop) => shop.id === selectedShopForDelete)) {
+        setSelectedShopForDelete(filtered[0].id);
+      }
+    }
+  }, [roleInfo?.role, shops, selectedEstablishmentForDelete, selectedShopForDelete]);
+
+  const filteredShopsForDelete = isSuperAdmin && selectedEstablishmentForDelete
+    ? shops.filter((shop) => shop.tenant_id === selectedEstablishmentForDelete)
+    : shops;
+
   function openBulkDeleteModal() {
     setBulkDeleteScope('shop');
     setShowBulkDeleteModal(true);
   }
 
   async function handleBulkDelete() {
-    if (!roleInfo?.tenant_id) {
-      alert("Impossible de déterminer l'établissement pour la suppression");
+    const deleteAll = bulkDeleteScope === 'tenant';
+    if (isSuperAdmin && !selectedEstablishmentForDelete) {
+      alert('Veuillez sélectionner un établissement');
       return;
     }
 
-    const deleteAll = bulkDeleteScope === 'tenant';
     if (!deleteAll && !selectedShopForDelete) {
       alert('Veuillez sélectionner une boutique');
+      return;
+    }
+
+    let tenantIdForDeletion = roleInfo?.tenant_id || '';
+    if (!tenantIdForDeletion) {
+      if (deleteAll) {
+        tenantIdForDeletion = selectedEstablishmentForDelete;
+      } else {
+        tenantIdForDeletion = shops.find((shop) => shop.id === selectedShopForDelete)?.tenant_id || selectedEstablishmentForDelete;
+      }
+    }
+
+    if (!tenantIdForDeletion) {
+      alert("Impossible de déterminer l'établissement pour la suppression");
       return;
     }
 
@@ -266,7 +320,7 @@ export default function Products() {
     try {
       setBulkDeleting(true);
       const { data, error } = await supabase.rpc('delete_products_bulk', {
-        target_tenant_id: roleInfo.tenant_id,
+        target_tenant_id: tenantIdForDeletion,
         target_shop_id: deleteAll ? null : selectedShopForDelete,
         delete_all_shops: deleteAll,
       });
@@ -578,51 +632,71 @@ export default function Products() {
             </div>
 
             <div className="p-6 space-y-6">
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-3">Portée de la suppression</p>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="bulk-delete-scope"
-                      value="shop"
-                      checked={bulkDeleteScope === 'shop'}
-                      onChange={() => setBulkDeleteScope('shop')}
-                      className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
-                    />
-                    <span className="text-sm text-gray-700">Supprimer les produits d'une boutique spécifique</span>
-                  </label>
-                  <label className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="bulk-delete-scope"
-                      value="tenant"
-                      checked={bulkDeleteScope === 'tenant'}
-                      onChange={() => setBulkDeleteScope('tenant')}
-                      className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
-                    />
-                    <span className="text-sm text-gray-700">Supprimer tous les produits de l'établissement</span>
-                  </label>
-                </div>
-              </div>
+              <div className="space-y-4">
+                {isSuperAdmin && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Choisir l'établissement</p>
+                    <select
+                      value={selectedEstablishmentForDelete}
+                      onChange={(e) => setSelectedEstablishmentForDelete(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      {establishments.length === 0 && <option value="">Aucun établissement disponible</option>}
+                      {establishments.map((establishment) => (
+                        <option key={establishment.id} value={establishment.id}>
+                          {establishment.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-              {bulkDeleteScope === 'shop' && (
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">Choisir la boutique</p>
-                  <select
-                    value={selectedShopForDelete}
-                    onChange={(e) => setSelectedShopForDelete(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    {shops.length === 0 && <option value="">Aucune boutique disponible</option>}
-                    {shops.map((shop) => (
-                      <option key={shop.id} value={shop.id}>
-                        {shop.name}
-                      </option>
-                    ))}
-                  </select>
+                  <p className="text-sm font-medium text-gray-700 mb-3">Portée de la suppression</p>
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="bulk-delete-scope"
+                        value="shop"
+                        checked={bulkDeleteScope === 'shop'}
+                        onChange={() => setBulkDeleteScope('shop')}
+                        className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                      />
+                      <span className="text-sm text-gray-700">Supprimer les produits d'une boutique spécifique</span>
+                    </label>
+                    <label className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="bulk-delete-scope"
+                        value="tenant"
+                        checked={bulkDeleteScope === 'tenant'}
+                        onChange={() => setBulkDeleteScope('tenant')}
+                        className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                      />
+                      <span className="text-sm text-gray-700">Supprimer tous les produits de l'établissement</span>
+                    </label>
+                  </div>
                 </div>
-              )}
+
+                {bulkDeleteScope === 'shop' && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Choisir la boutique</p>
+                    <select
+                      value={selectedShopForDelete}
+                      onChange={(e) => setSelectedShopForDelete(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      {filteredShopsForDelete.length === 0 && <option value="">Aucune boutique disponible</option>}
+                      {filteredShopsForDelete.map((shop) => (
+                        <option key={shop.id} value={shop.id}>
+                          {shop.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
 
               <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-4">
                 <p className="font-semibold mb-1">Attention</p>
