@@ -15,7 +15,12 @@ import {
   Filter,
   ChevronRight,
   AlertCircle,
+  Settings,
 } from 'lucide-react';
+import TransferModal from '../components/inventory/TransferModal';
+import TransferDetailsModal from '../components/inventory/TransferDetailsModal';
+import InventoryModal from '../components/inventory/InventoryModal';
+import AdjustmentModal from '../components/inventory/AdjustmentModal';
 
 interface Tab {
   id: string;
@@ -78,6 +83,12 @@ export default function Inventory() {
   
   // Inventories data
   const [inventories, setInventories] = useState<PhysicalInventory[]>([]);
+
+  // Modals
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -256,14 +267,27 @@ export default function Inventory() {
           <p className="text-gray-600">Transferts, inventaires et alertes de stock</p>
         </div>
         
-        <button
-          onClick={() => alert('Fonction à implémenter')}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          {activeTab === 'transfers' ? 'Nouveau transfert' : 
-           activeTab === 'inventories' ? 'Nouvel inventaire' : 'Action'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAdjustmentModal(true)}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+            title="Ajustement manuel"
+          >
+            <Settings className="w-4 h-4" />
+            Ajustement
+          </button>
+          <button
+            onClick={() => {
+              if (activeTab === 'transfers') setShowTransferModal(true);
+              else if (activeTab === 'inventories') setShowInventoryModal(true);
+            }}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            {activeTab === 'transfers' ? 'Nouveau transfert' : 
+             activeTab === 'inventories' ? 'Nouvel inventaire' : 'Action'}
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -377,7 +401,11 @@ export default function Inventory() {
               {/* Transfers List */}
               <div className="space-y-3">
                 {filteredTransfers.map((transfer) => (
-                  <div key={transfer.id} className="border border-gray-200 rounded-lg p-4 hover:border-primary transition-colors cursor-pointer">
+                  <div 
+                    key={transfer.id} 
+                    onClick={() => setSelectedTransferId(transfer.id)}
+                    className="border border-gray-200 rounded-lg p-4 hover:border-primary transition-colors cursor-pointer"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
@@ -558,6 +586,48 @@ export default function Inventory() {
           )}
         </div>
       </div>
+
+      {/* Modals */}
+      {showTransferModal && (
+        <TransferModal
+          onClose={() => setShowTransferModal(false)}
+          onSave={() => {
+            setShowTransferModal(false);
+            loadData();
+          }}
+        />
+      )}
+
+      {showInventoryModal && (
+        <InventoryModal
+          onClose={() => setShowInventoryModal(false)}
+          onSave={() => {
+            setShowInventoryModal(false);
+            loadData();
+          }}
+        />
+      )}
+
+      {showAdjustmentModal && (
+        <AdjustmentModal
+          onClose={() => setShowAdjustmentModal(false)}
+          onSave={() => {
+            setShowAdjustmentModal(false);
+            loadData();
+          }}
+        />
+      )}
+
+      {selectedTransferId && (
+        <TransferDetailsModal
+          transferId={selectedTransferId}
+          onClose={() => setSelectedTransferId(null)}
+          onUpdate={() => {
+            setSelectedTransferId(null);
+            loadData();
+          }}
+        />
+      )}
     </div>
   );
 }
