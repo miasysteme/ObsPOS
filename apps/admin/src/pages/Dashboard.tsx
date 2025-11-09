@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSuperAdmin } from '../lib/supabase';
 import {
   LayoutDashboard,
   Building2,
@@ -34,10 +34,21 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
 
   useEffect(() => {
     fetchStats();
+    checkUserRole();
   }, []);
+
+  async function checkUserRole() {
+    try {
+      const superAdmin = await isSuperAdmin();
+      setIsSuperAdminUser(superAdmin);
+    } catch (error) {
+      console.error('Error checking user role:', error);
+    }
+  }
 
   async function fetchStats() {
     try {
@@ -121,17 +132,20 @@ export default function Dashboard() {
               <LayoutDashboard className="w-5 h-5" />
               <span className="font-medium">Tableau de bord</span>
             </button>
-            <button
-              onClick={() => setActiveTab('establishments')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                activeTab === 'establishments'
-                  ? 'bg-primary text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <Building2 className="w-5 h-5" />
-              <span className="font-medium">Établissements</span>
-            </button>
+            {/* Établissements: Réservé au super_admin */}
+            {isSuperAdminUser && (
+              <button
+                onClick={() => setActiveTab('establishments')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                  activeTab === 'establishments'
+                    ? 'bg-primary text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <Building2 className="w-5 h-5" />
+                <span className="font-medium">Établissements</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('users')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
@@ -143,17 +157,20 @@ export default function Dashboard() {
               <Users className="w-5 h-5" />
               <span className="font-medium">Utilisateurs</span>
             </button>
-            <button
-              onClick={() => setActiveTab('payments')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                activeTab === 'payments'
-                  ? 'bg-primary text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <CreditCard className="w-5 h-5" />
-              <span className="font-medium">Paiements</span>
-            </button>
+            {/* Paiements: Réservé au super_admin */}
+            {isSuperAdminUser && (
+              <button
+                onClick={() => setActiveTab('payments')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                  activeTab === 'payments'
+                    ? 'bg-primary text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <CreditCard className="w-5 h-5" />
+                <span className="font-medium">Paiements</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('shops')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
@@ -309,11 +326,11 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeTab === 'establishments' && <Establishments />}
+          {activeTab === 'establishments' && isSuperAdminUser && <Establishments />}
           
           {activeTab === 'users' && <UsersPage />}
           
-          {activeTab === 'payments' && <PaymentsPage />}
+          {activeTab === 'payments' && isSuperAdminUser && <PaymentsPage />}
           
           {activeTab === 'shops' && <ShopsPage />}
           
