@@ -80,6 +80,12 @@ export default function Shops() {
 
       if (error) throw error;
 
+      // Guard against null/undefined data
+      if (!shopsData || !Array.isArray(shopsData)) {
+        setShops([]);
+        return;
+      }
+
       // Load stats for each shop
       const shopsWithStats = await Promise.all(
         shopsData.map(async (shop: any) => {
@@ -101,7 +107,9 @@ export default function Shops() {
       setShops(shopsWithStats);
     } catch (error) {
       console.error('Error loading data:', error);
+      // Set empty array on error to prevent infinite loading
       setShops([]);
+      setEstablishments([]);
     } finally {
       setLoading(false);
     }
