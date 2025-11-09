@@ -410,6 +410,7 @@ export default function Products() {
         <ProductModal
           product={editingProduct}
           categories={categories}
+          shops={shops}
           onClose={() => { setShowAddModal(false); setEditingProduct(null); }}
           onSave={() => { setShowAddModal(false); setEditingProduct(null); loadData(); }}
         />
@@ -434,6 +435,7 @@ export default function Products() {
 
       {showImportExportModal && (
         <ImportExportModal
+          shops={shops}
           onClose={() => setShowImportExportModal(false)}
           onImportComplete={() => { setShowImportExportModal(false); loadData(); }}
         />

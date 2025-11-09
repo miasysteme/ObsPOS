@@ -2,7 +2,13 @@ import { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Download, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 
+interface Shop {
+  id: string;
+  name: string;
+}
+
 interface ImportExportModalProps {
+  shops: Shop[];
   onClose: () => void;
   onImportComplete: () => void;
 }
@@ -12,10 +18,11 @@ interface ImportResult {
   errors: { row: number; message: string }[];
 }
 
-export default function ImportExportModal({ onClose, onImportComplete }: ImportExportModalProps) {
+export default function ImportExportModal({ shops, onClose, onImportComplete }: ImportExportModalProps) {
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [selectedShopId, setSelectedShopId] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleExport() {
@@ -30,10 +37,10 @@ export default function ImportExportModal({ onClose, onImportComplete }: ImportE
         .eq('id', user.id)
         .single();
 
-      // Récupérer tous les produits avec leurs catégories
+      // Récupérer tous les produits avec leurs catégories et boutiques
       let query = supabase
         .from('products')
-        .select('*, category:categories(name)');
+        .select('*, category:categories(name), shop:shops(name)');
 
       // Si pas super_admin, filtrer par tenant_id
       if (userData?.role !== 'super_admin' && userData?.tenant_id) {
@@ -48,15 +55,27 @@ export default function ImportExportModal({ onClose, onImportComplete }: ImportE
         return;
       }
 
-      // Créer le CSV
+      // Créer le CSV avec tous les champs
       const headers = [
         'SKU',
+        'Code-barre',
         'Nom',
-        'Catégorie',
-        'Prix de base',
-        'Prix de vente',
-        'Stock minimum',
         'Description',
+        'Catégorie',
+        'Boutique',
+        'Marque',
+        'Modèle',
+        'Capacité',
+        'Couleur',
+        'Taille',
+        'Poids (kg)',
+        'Date péremption',
+        'Prix de base (FCFA)',
+        'Prix d\'achat (FCFA)',
+        'Prix Particulier (FCFA)',
+        'Prix Demi-Grossiste (FCFA)',
+        'Prix Grossiste (FCFA)',
+        'Stock minimum',
         'Actif'
       ];
 
@@ -64,12 +83,24 @@ export default function ImportExportModal({ onClose, onImportComplete }: ImportE
         headers.join(','),
         ...products.map(p => [
           p.sku || '',
+          p.barcode || '',
           `"${p.name || ''}"`,
-          `"${p.category?.name || ''}"`,
-          p.base_price || 0,
-          p.selling_price || 0,
-          p.min_stock || 0,
           `"${(p.description || '').replace(/"/g, '""')}"`,
+          `"${(p as any).category?.name || ''}"`,
+          `"${(p as any).shop?.name || ''}"`,
+          `"${p.brand || ''}"`,
+          `"${p.model || ''}"`,
+          `"${p.capacity || ''}"`,
+          `"${p.color || ''}"`,
+          `"${p.size || ''}"`,
+          p.weight || '',
+          p.expiry_date || '',
+          p.base_price || 0,
+          p.cost_price || 0,
+          p.retail_price || '',
+          p.semi_wholesale_price || '',
+          p.wholesale_price || '',
+          p.min_stock_level || 5,
           p.is_active ? 'Oui' : 'Non'
         ].join(','))
       ];
@@ -136,30 +167,47 @@ export default function ImportExportModal({ onClose, onImportComplete }: ImportE
         const line = lines[i];
         const values = parseCSVLine(line);
         
-        if (values.length < 8) {
+        if (values.length < 3) {
           errors.push({ row: i + 1, message: 'Nombre de colonnes insuffisant' });
           continue;
         }
 
         try {
-          const [sku, name, categoryName, basePrice, sellingPrice, minStock, description, isActive] = values;
+          const [
+            sku, barcode, name, description, categoryName, _shopName,
+            brand, model, capacity, color, size, weight, expiryDate,
+            basePrice, costPrice, retailPrice, semiWholesalePrice, wholesalePrice,
+            minStock, isActive
+          ] = values;
 
           if (!name || !basePrice) {
             errors.push({ row: i + 1, message: 'Nom et prix de base requis' });
             continue;
           }
 
-          const categoryId = categoryMap.get(categoryName.toLowerCase());
+          const categoryId = categoryName ? categoryMap.get(categoryName.toLowerCase()) : null;
 
-          const productData = {
+          const productData: any = {
             sku: sku || `SKU-${Date.now()}-${i}`,
+            barcode: barcode || '',
             name,
-            category_id: categoryId || null,
-            base_price: parseFloat(basePrice) || 0,
-            selling_price: parseFloat(sellingPrice) || parseFloat(basePrice) || 0,
-            min_stock: parseInt(minStock) || 0,
             description: description || '',
-            is_active: isActive.toLowerCase() === 'oui' || isActive.toLowerCase() === 'yes',
+            category_id: categoryId || null,
+            shop_id: selectedShopId || null,
+            brand: brand || null,
+            model: model || null,
+            capacity: capacity || null,
+            color: color || null,
+            size: size || null,
+            weight: weight ? parseFloat(weight) : null,
+            expiry_date: expiryDate || null,
+            base_price: parseFloat(basePrice) || 0,
+            cost_price: costPrice ? parseFloat(costPrice) : 0,
+            retail_price: retailPrice ? parseFloat(retailPrice) : null,
+            semi_wholesale_price: semiWholesalePrice ? parseFloat(semiWholesalePrice) : null,
+            wholesale_price: wholesalePrice ? parseFloat(wholesalePrice) : null,
+            min_stock_level: minStock ? parseInt(minStock) : 5,
+            is_active: isActive?.toLowerCase() === 'oui' || isActive?.toLowerCase() === 'yes',
             tenant_id: userData?.tenant_id || null,
           };
 
@@ -222,23 +270,47 @@ export default function ImportExportModal({ onClose, onImportComplete }: ImportE
   function downloadTemplate() {
     const headers = [
       'SKU',
+      'Code-barre',
       'Nom',
-      'Catégorie',
-      'Prix de base',
-      'Prix de vente',
-      'Stock minimum',
       'Description',
+      'Catégorie',
+      'Boutique',
+      'Marque',
+      'Modèle',
+      'Capacité',
+      'Couleur',
+      'Taille',
+      'Poids (kg)',
+      'Date péremption',
+      'Prix de base (FCFA)',
+      'Prix d\'achat (FCFA)',
+      'Prix Particulier (FCFA)',
+      'Prix Demi-Grossiste (FCFA)',
+      'Prix Grossiste (FCFA)',
+      'Stock minimum',
       'Actif'
     ];
 
     const example = [
       'IPHONE14',
-      'iPhone 14 Pro Max 256GB',
-      'SMARTPHONES',
-      '750000',
-      '850000',
-      '5',
+      '123456789012',
+      'iPhone 14 Pro Max',
       'Dernier modèle Apple avec écran 6.7 pouces',
+      'SMARTPHONES',
+      '',
+      'Apple',
+      'iPhone 14 Pro Max',
+      '256GB',
+      'Space Black',
+      '6.7"',
+      '0.240',
+      '',
+      '750000',
+      '650000',
+      '850000',
+      '800000',
+      '750000',
+      '5',
       'Oui'
     ];
 
@@ -328,7 +400,29 @@ export default function ImportExportModal({ onClose, onImportComplete }: ImportE
                 <p className="text-sm text-gray-600 mb-4">
                   Importez plusieurs produits à la fois depuis un fichier CSV. Le fichier doit suivre le format du modèle.
                 </p>
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  {/* Shop Selector */}
+                  <div className="bg-white rounded-lg p-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Boutique destination (optionnel)
+                    </label>
+                    <select
+                      value={selectedShopId}
+                      onChange={(e) => setSelectedShopId(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      <option value="">Toutes les boutiques</option>
+                      {shops.map((shop) => (
+                        <option key={shop.id} value={shop.id}>
+                          {shop.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Si spécifiée, tous les produits importés seront affectés à cette boutique
+                    </p>
+                  </div>
+                  
                   <div className="bg-white rounded-lg p-4 border-2 border-dashed border-gray-300">
                     <input
                       ref={fileInputRef}
@@ -359,9 +453,10 @@ export default function ImportExportModal({ onClose, onImportComplete }: ImportE
                     </label>
                   </div>
                   <div className="text-xs text-gray-500 space-y-1">
-                    <p><strong>Format attendu :</strong> SKU, Nom, Catégorie, Prix de base, Prix de vente, Stock minimum, Description, Actif</p>
+                    <p><strong>Format attendu :</strong> SKU, Code-barre, Nom, Description, Catégorie, Boutique, Marque, Modèle, Capacité, Couleur, Taille, Poids, Date péremption, Prix base, Prix achat, Prix Particulier, Prix Demi-Grossiste, Prix Grossiste, Stock min, Actif</p>
                     <p><strong>Encodage :</strong> UTF-8</p>
                     <p><strong>Séparateur :</strong> Virgule (,)</p>
+                    <p><strong>Note :</strong> Tous les champs sauf Nom et Prix de base sont optionnels</p>
                   </div>
                 </div>
               </div>

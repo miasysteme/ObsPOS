@@ -14,6 +14,17 @@ interface Product {
   min_stock_level: number;
   is_active: boolean;
   category_id: string | null;
+  shop_id?: string | null;
+  brand?: string;
+  model?: string;
+  capacity?: string;
+  size?: string;
+  color?: string;
+  weight?: number;
+  expiry_date?: string;
+  retail_price?: number;
+  semi_wholesale_price?: number;
+  wholesale_price?: number;
 }
 
 interface Category {
@@ -21,27 +32,41 @@ interface Category {
   name: string;
 }
 
+interface Shop {
+  id: string;
+  name: string;
+}
+
 interface ProductModalProps {
   product: Product | null;
   categories: Category[];
+  shops: Shop[];
   onClose: () => void;
   onSave: () => void;
 }
 
-export default function ProductModal({ product, categories, onClose, onSave }: ProductModalProps) {
+export default function ProductModal({ product, categories, shops, onClose, onSave }: ProductModalProps) {
   const [formData, setFormData] = useState({
     name: product?.name || '',
     description: product?.description || '',
     category_id: product?.category_id || '',
+    shop_id: product?.shop_id || '',
     sku: product?.sku || '',
     barcode: product?.barcode || '',
     base_price: product?.base_price || 0,
     cost_price: product?.cost_price || 0,
     min_stock_level: product?.min_stock_level || 5,
     is_active: product?.is_active ?? true,
-    retail_price: (product as any)?.retail_price || 0,
-    semi_wholesale_price: (product as any)?.semi_wholesale_price || 0,
-    wholesale_price: (product as any)?.wholesale_price || 0,
+    retail_price: product?.retail_price || 0,
+    semi_wholesale_price: product?.semi_wholesale_price || 0,
+    wholesale_price: product?.wholesale_price || 0,
+    brand: product?.brand || '',
+    model: product?.model || '',
+    capacity: product?.capacity || '',
+    size: product?.size || '',
+    color: product?.color || '',
+    weight: product?.weight || 0,
+    expiry_date: product?.expiry_date || '',
   });
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState(product?.image_url || '');
@@ -189,6 +214,19 @@ export default function ProductModal({ product, categories, onClose, onSave }: P
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Boutique</label>
+              <select value={formData.shop_id}
+                onChange={(e) => setFormData({ ...formData, shop_id: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                <option value="">Toutes les boutiques</option>
+                {shops.map((shop) => (
+                  <option key={shop.id} value={shop.id}>{shop.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Si non spécifié, le produit sera disponible dans toutes les boutiques</p>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">SKU</label>
               <div className="relative">
                 <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -264,6 +302,70 @@ export default function ProductModal({ product, categories, onClose, onSave }: P
               </div>
               <p className="text-xs text-blue-600 mt-2">
                 Ces prix seront affichés comme suggestions dans le POS selon le type de client sélectionné. Le vendeur pourra toujours saisir un prix différent.
+              </p>
+            </div>
+
+            <div className="md:col-span-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h4 className="font-semibold text-gray-900 mb-3">Attributs Produit (Optionnel)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Marque</label>
+                  <input type="text"
+                    value={formData.brand}
+                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="Apple, Samsung, Huawei..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Modèle</label>
+                  <input type="text"
+                    value={formData.model}
+                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="iPhone 14 Pro Max..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacité</label>
+                  <input type="text"
+                    value={formData.capacity}
+                    onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="128GB, 256GB, 1L..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Couleur</label>
+                  <input type="text"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="Noir, Blanc, Bleu..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Taille</label>
+                  <input type="text"
+                    value={formData.size}
+                    onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="XL, 42, 15.6&quot;..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Poids (kg)</label>
+                  <input type="number" min="0" step="0.01"
+                    value={formData.weight}
+                    onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="0.5" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Date de péremption</label>
+                  <input type="date"
+                    value={formData.expiry_date}
+                    onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Ces champs sont optionnels. Remplissez uniquement ceux pertinents pour votre type de boutique (téléphones, vêtements, alimentation, etc.).
               </p>
             </div>
 
