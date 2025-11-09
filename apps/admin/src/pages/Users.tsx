@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseUrl } from '../lib/supabase';
 import {
   Users as UsersIcon,
   Plus,
@@ -519,46 +519,38 @@ function UserModal({ user, establishments, shops, onClose, onSave }: any) {
           console.log('Email update requires admin API call');
         }
       } else {
-        // Create new user
-        // Utiliser signUp au lieu de admin.createUser car nous n'avons pas les droits admin dans le frontend
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            data: {
-              full_name: formData.full_name,
-            },
-            emailRedirectTo: undefined, // Pas de redirection email
-          },
-        });
-
-        if (authError) throw authError;
+        // Create new user using Edge Function (with admin privileges)
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (!authData.user) {
-          throw new Error('Impossible de créer l\'utilisateur Auth');
+        if (!session) {
+          throw new Error('Session non valide. Veuillez vous reconnecter.');
         }
 
-        // Attendre un peu pour que le trigger auth.users se termine
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Mettre à jour ou créer l'enregistrement utilisateur
-        const { error: upsertError } = await supabase
-          .from('users')
-          .upsert([{
-            id: authData.user.id,
+        const response = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             email: formData.email,
+            password: formData.password,
             full_name: formData.full_name,
             role: formData.role,
             tenant_id: formData.tenant_id || null,
             shop_id: formData.shop_id || null,
             is_active: formData.is_active,
-          }], {
-            onConflict: 'id',
-          });
+          }),
+        });
 
-        if (upsertError) {
-          console.error('Upsert error details:', upsertError);
-          throw new Error(`Erreur création utilisateur: ${upsertError.message}`);
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Erreur lors de la création');
+        }
+
+        if (!result.success) {
+          throw new Error(result.error || 'Erreur inconnue');
         }
       }
 
