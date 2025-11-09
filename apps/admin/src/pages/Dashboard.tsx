@@ -13,6 +13,7 @@ import {
   Package,
   ShoppingCart,
   BarChart3,
+  Warehouse,
 } from 'lucide-react';
 import Establishments from './Establishments';
 import UsersPage from './Users';
@@ -22,6 +23,7 @@ import ProductsPage from './Products';
 import POSPage from './POS';
 import ReportsPage from './Reports';
 import CustomersPage from './Customers';
+import InventoryPage from './Inventory';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -175,6 +177,17 @@ export default function Dashboard() {
               <span className="font-medium">Produits</span>
             </button>
             <button
+              onClick={() => setActiveTab('inventory')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                activeTab === 'inventory'
+                  ? 'bg-primary text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <Warehouse className="w-5 h-5" />
+              <span className="font-medium">Inventaire</span>
+            </button>
+            <button
               onClick={() => setActiveTab('pos')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
                 activeTab === 'pos'
@@ -306,13 +319,15 @@ export default function Dashboard() {
           
           {activeTab === 'products' && <ProductsPage />}
           
+          {activeTab === 'inventory' && <InventoryPage />}
+          
           {activeTab === 'pos' && <POSPage />}
           
           {activeTab === 'customers' && <CustomersPage />}
           
           {activeTab === 'reports' && <ReportsPage />}
 
-          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && activeTab !== 'payments' && activeTab !== 'shops' && activeTab !== 'products' && activeTab !== 'pos' && activeTab !== 'customers' && activeTab !== 'reports' && (
+          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && activeTab !== 'payments' && activeTab !== 'shops' && activeTab !== 'products' && activeTab !== 'inventory' && activeTab !== 'pos' && activeTab !== 'customers' && activeTab !== 'reports' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 {activeTab === 'settings' && 'Paramètres de la plateforme'}
