@@ -242,8 +242,12 @@ export default function POS() {
     if (cart.length === 0 || !currentShop) return;
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
+      // ✅ CORRECTION 1: Créer la vente
       const { data: saleData, error: saleError } = await supabase
         .from('sales')
         .insert([
@@ -253,6 +257,7 @@ export default function POS() {
             payment_method: paymentMethod,
             customer_type: customerType,
             status: 'completed',
+            // customer_id: à ajouter quand fonctionnalité client sera implémentée
           },
         ])
         .select()
@@ -260,6 +265,7 @@ export default function POS() {
 
       if (saleError) throw saleError;
 
+      // ✅ CORRECTION 2: Créer les sale_items
       const saleItems = cart.map(item => ({
         sale_id: saleData.id,
         product_id: item.product.id,
@@ -274,13 +280,53 @@ export default function POS() {
 
       if (itemsError) throw itemsError;
 
-      alert('Vente enregistrée avec succès !');
+      // ✅ CORRECTION 3: Décrémenter le stock dans inventory
+      for (const item of cart) {
+        // Récupérer le stock actuel
+        const { data: currentStock } = await supabase
+          .from('inventory')
+          .select('quantity')
+          .eq('shop_id', currentShop.id)
+          .eq('product_id', item.product.id)
+          .single();
+
+        if (currentStock) {
+          const newQuantity = currentStock.quantity - item.quantity;
+          
+          const { error: stockError } = await supabase
+            .from('inventory')
+            .update({ quantity: newQuantity })
+            .eq('shop_id', currentShop.id)
+            .eq('product_id', item.product.id);
+
+          if (stockError) {
+            console.error('Stock update error:', stockError);
+            // Ne pas bloquer la vente mais log l'erreur
+          }
+        }
+
+        // ✅ CORRECTION 4: Créer mouvement de stock
+        await supabase
+          .from('stock_movements')
+          .insert([{
+            shop_id: currentShop.id,
+            product_id: item.product.id,
+            movement_type: 'SALE',
+            quantity: -item.quantity,
+            reference_type: 'SALE',
+            reference_id: saleData.id,
+            notes: `Vente ticket #${saleData.id}`,
+            created_by: user.id,
+          }]);
+      }
+
+      alert(`✅ Vente enregistrée avec succès !\nTicket: ${saleData.id}\nTotal: ${total.toLocaleString()} FCFA`);
       setCart([]);
       setShowPaymentModal(false);
-      loadData();
+      loadData(); // Recharger produits pour mettre à jour stock
     } catch (error: any) {
       console.error('Error processing payment:', error);
-      alert(`Erreur lors du paiement: ${error.message}`);
+      alert(`❌ Erreur lors du paiement: ${error.message}`);
     }
   }
 
@@ -651,19 +697,26 @@ export default function POS() {
                 onClick={() => processPayment('cash')}
                 className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
-                Espèces
+                💵 Espèces
               </button>
               <button
                 onClick={() => processPayment('mobile_money')}
                 className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
-                Mobile Money
+                📱 Mobile Money
               </button>
               <button
                 onClick={() => processPayment('card')}
                 className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
               >
-                Carte Bancaire
+                💳 Carte Bancaire
+              </button>
+              <button
+                onClick={() => processPayment('credit')}
+                className="w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                title="À implémenter avec sélection client"
+              >
+                💰 À Crédit (Client)
               </button>
               <button
                 onClick={() => setShowPaymentModal(false)}
