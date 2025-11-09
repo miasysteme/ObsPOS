@@ -12,6 +12,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import Establishments from './Establishments';
+import UsersPage from './Users';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -224,11 +225,12 @@ export default function Dashboard() {
           )}
 
           {activeTab === 'establishments' && <Establishments />}
+          
+          {activeTab === 'users' && <UsersPage />}
 
-          {activeTab !== 'dashboard' && activeTab !== 'establishments' && (
+          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                {activeTab === 'users' && 'Gestion des utilisateurs'}
                 {activeTab === 'payments' && 'Gestion des paiements'}
                 {activeTab === 'settings' && 'Paramètres de la plateforme'}
               </h2>
