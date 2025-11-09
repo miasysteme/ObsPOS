@@ -504,19 +504,31 @@ function UserModal({ user, establishments, shops, onClose, onSave }: any) {
         }
       } else {
         // Create new user
-        // First, create auth user
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        // Utiliser signUp au lieu de admin.createUser car nous n'avons pas les droits admin dans le frontend
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
-          email_confirm: true,
+          options: {
+            data: {
+              full_name: formData.full_name,
+            },
+            emailRedirectTo: undefined, // Pas de redirection email
+          },
         });
 
         if (authError) throw authError;
+        
+        if (!authData.user) {
+          throw new Error('Impossible de créer l\'utilisateur Auth');
+        }
 
-        // Then create user record
-        const { error: insertError } = await supabase
+        // Attendre un peu pour que le trigger auth.users se termine
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Mettre à jour ou créer l'enregistrement utilisateur
+        const { error: upsertError } = await supabase
           .from('users')
-          .insert([{
+          .upsert([{
             id: authData.user.id,
             email: formData.email,
             full_name: formData.full_name,
@@ -525,9 +537,11 @@ function UserModal({ user, establishments, shops, onClose, onSave }: any) {
             tenant_id: formData.tenant_id || null,
             shop_id: formData.shop_id || null,
             is_active: formData.is_active,
-          }]);
+          }], {
+            onConflict: 'id',
+          });
 
-        if (insertError) throw insertError;
+        if (upsertError) throw upsertError;
       }
 
       onSave();
