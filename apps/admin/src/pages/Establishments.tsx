@@ -44,26 +44,41 @@ export default function Establishments() {
   async function loadEstablishments() {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Load establishments
+      const { data: establishments, error } = await supabase
         .from('establishments')
-        .select(`
-          *,
-          shops:shops(count),
-          users:users(count)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const formattedData = data.map((est: any) => ({
-        ...est,
-        shops_count: est.shops[0]?.count || 0,
-        users_count: est.users[0]?.count || 0,
-      }));
+      // Load shops count for each establishment
+      const establishmentsWithCounts = await Promise.all(
+        establishments.map(async (est: any) => {
+          const { count: shopsCount } = await supabase
+            .from('shops')
+            .select('*', { count: 'exact', head: true })
+            .eq('tenant_id', est.id);
 
-      setEstablishments(formattedData);
+          const { count: usersCount } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .eq('tenant_id', est.id);
+
+          return {
+            ...est,
+            shops_count: shopsCount || 0,
+            users_count: usersCount || 0,
+          };
+        })
+      );
+
+      setEstablishments(establishmentsWithCounts);
     } catch (error) {
       console.error('Error loading establishments:', error);
+      // Set empty array on error to prevent infinite loading
+      setEstablishments([]);
     } finally {
       setLoading(false);
     }
@@ -402,11 +417,19 @@ function EstablishmentModal({ establishment, onClose, onSave }: any) {
     setSaving(true);
 
     try {
+      // Préparer les données avec le bon format de date
+      const dataToSave = {
+        ...formData,
+        subscription_expires_at: formData.subscription_expires_at 
+          ? new Date(formData.subscription_expires_at).toISOString()
+          : null,
+      };
+
       if (establishment) {
         // Update
         const { error } = await supabase
           .from('establishments')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', establishment.id);
 
         if (error) throw error;
@@ -414,15 +437,15 @@ function EstablishmentModal({ establishment, onClose, onSave }: any) {
         // Insert
         const { error } = await supabase
           .from('establishments')
-          .insert([formData]);
+          .insert([dataToSave]);
 
         if (error) throw error;
       }
 
       onSave();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving establishment:', error);
-      alert('Erreur lors de l\'enregistrement');
+      alert(`Erreur lors de l'enregistrement: ${error.message || 'Erreur inconnue'}`);
     } finally {
       setSaving(false);
     }
