@@ -80,14 +80,14 @@ export default function ProductModal({ product, categories, onClose, onSave }: P
 
       const { data: userData } = await supabase
         .from('users')
-        .select('tenant_id')
+        .select('tenant_id, role')
         .eq('id', user.id)
         .single();
 
       const productData = {
         ...formData,
         image_url: imageUrl || null,
-        tenant_id: userData?.tenant_id,
+        tenant_id: userData?.tenant_id || null,
         category_id: formData.category_id || null,
       };
 
@@ -96,16 +96,26 @@ export default function ProductModal({ product, categories, onClose, onSave }: P
           .from('products')
           .update(productData)
           .eq('id', product.id);
-        if (error) throw error;
+        
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
       } else {
-        const { error } = await supabase.from('products').insert([productData]);
-        if (error) throw error;
+        const { error } = await supabase
+          .from('products')
+          .insert([productData]);
+        
+        if (error) {
+          console.error('Insert error:', error);
+          throw error;
+        }
       }
 
       onSave();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error);
-      alert('Erreur lors de l\'enregistrement du produit');
+      alert(`Erreur lors de l'enregistrement du produit: ${error.message || 'Erreur inconnue'}`);
     } finally {
       setSaving(false);
     }

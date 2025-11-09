@@ -11,10 +11,12 @@ import {
   Tag,
   Box,
   TrendingDown,
+  FileSpreadsheet,
 } from 'lucide-react';
 import ProductModal from '../components/products/ProductModal';
 import CategoryModal from '../components/products/CategoryModal';
 import StockModal from '../components/products/StockModal';
+import ImportExportModal from '../components/products/ImportExportModal';
 
 interface Category {
   id: string;
@@ -56,6 +58,7 @@ export default function Products() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
+  const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -285,6 +288,14 @@ export default function Products() {
           </button>
 
           <button
+            onClick={() => setShowImportExportModal(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Import/Export
+          </button>
+
+          <button
             onClick={() => {
               setEditingProduct(null);
               setShowAddModal(true);
@@ -418,6 +429,13 @@ export default function Products() {
           shops={shops}
           onClose={() => { setShowStockModal(false); setSelectedProduct(null); }}
           onSave={() => { setShowStockModal(false); setSelectedProduct(null); loadData(); }}
+        />
+      )}
+
+      {showImportExportModal && (
+        <ImportExportModal
+          onClose={() => setShowImportExportModal(false)}
+          onImportComplete={() => { setShowImportExportModal(false); loadData(); }}
         />
       )}
     </div>

@@ -34,13 +34,16 @@ export default function CategoryModal({ categories, onClose, onSave }: CategoryM
 
       const { data: userData } = await supabase
         .from('users')
-        .select('tenant_id')
+        .select('tenant_id, role')
         .eq('id', user.id)
         .single();
 
+      // Pour super_admin sans tenant_id, créer un tenant_id virtuel ou laisser null
+      // Les politiques RLS permettent au super_admin de créer même avec tenant_id null
       const categoryData = {
         ...formData,
-        tenant_id: userData?.tenant_id,
+        tenant_id: userData?.tenant_id || null,
+        is_active: true,
       };
 
       if (editingCategory) {
@@ -48,19 +51,29 @@ export default function CategoryModal({ categories, onClose, onSave }: CategoryM
           .from('categories')
           .update(categoryData)
           .eq('id', editingCategory.id);
-        if (error) throw error;
+        
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
       } else {
-        const { error } = await supabase.from('categories').insert([categoryData]);
-        if (error) throw error;
+        const { error } = await supabase
+          .from('categories')
+          .insert([categoryData]);
+        
+        if (error) {
+          console.error('Insert error:', error);
+          throw error;
+        }
       }
 
       setFormData({ name: '', description: '' });
       setShowAddForm(false);
       setEditingCategory(null);
       onSave();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving category:', error);
-      alert('Erreur lors de l\'enregistrement de la catégorie');
+      alert(`Erreur lors de l'enregistrement de la catégorie: ${error.message || 'Erreur inconnue'}`);
     } finally {
       setSaving(false);
     }
