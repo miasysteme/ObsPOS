@@ -54,6 +54,7 @@ export default function Shops() {
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
 
   useEffect(() => {
+    // Load shops and establishments on component mount
     loadData();
   }, []);
 
