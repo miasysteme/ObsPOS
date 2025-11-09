@@ -27,21 +27,34 @@ export async function getCurrentUser() {
 
 // Helper pour vérifier le rôle
 export async function getUserRole() {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  
-  const { data, error } = await supabase
-    .from('users')
-    .select('role, tenant_id, shop_id')
-    .eq('id', user.id)
-    .single();
-  
-  if (error) throw error;
-  return data;
+  try {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('role, tenant_id, shop_id')
+      .eq('id', user.id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching user role:', error);
+      return null;
+    }
+    return data;
+  } catch (error) {
+    console.error('Error in getUserRole:', error);
+    return null;
+  }
 }
 
 // Helper pour vérifier si l'utilisateur est super admin
 export async function isSuperAdmin() {
-  const role = await getUserRole();
-  return role?.role === 'super_admin';
+  try {
+    const role = await getUserRole();
+    return role?.role === 'super_admin';
+  } catch (error) {
+    console.error('Error in isSuperAdmin:', error);
+    return false;
+  }
 }
