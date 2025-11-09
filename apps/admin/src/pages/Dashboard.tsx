@@ -11,12 +11,14 @@ import {
   DollarSign,
   ShoppingBag,
   Package,
+  ShoppingCart,
 } from 'lucide-react';
 import Establishments from './Establishments';
 import UsersPage from './Users';
 import PaymentsPage from './Payments';
 import ShopsPage from './Shops';
 import ProductsPage from './Products';
+import POSPage from './POS';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -170,6 +172,17 @@ export default function Dashboard() {
               <span className="font-medium">Produits</span>
             </button>
             <button
+              onClick={() => setActiveTab('pos')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                activeTab === 'pos'
+                  ? 'bg-primary text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <ShoppingCart className="w-5 h-5" />
+              <span className="font-medium">Point de Vente</span>
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
                 activeTab === 'settings'
@@ -267,8 +280,10 @@ export default function Dashboard() {
           {activeTab === 'shops' && <ShopsPage />}
           
           {activeTab === 'products' && <ProductsPage />}
+          
+          {activeTab === 'pos' && <POSPage />}
 
-          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && activeTab !== 'payments' && activeTab !== 'shops' && activeTab !== 'products' && (
+          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && activeTab !== 'payments' && activeTab !== 'shops' && activeTab !== 'products' && activeTab !== 'pos' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 {activeTab === 'settings' && 'Paramètres de la plateforme'}
