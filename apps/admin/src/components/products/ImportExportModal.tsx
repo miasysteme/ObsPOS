@@ -92,7 +92,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
         'Taille',
         'Poids (kg)',
         'Date péremption',
-        'Prix de base (FCFA)',
+        'Prix de vente (FCFA)',
         'Prix d\'achat (FCFA)',
         'Prix Particulier (FCFA)',
         'Prix Demi-Grossiste (FCFA)',
@@ -122,7 +122,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
             `"${p.size || ''}"`,
             p.weight || '',
             p.expiry_date || '',
-            p.base_price || 0,
+            p.selling_price || 0,
             p.cost_price || 0,
             p.retail_price || '',
             p.semi_wholesale_price || '',
@@ -204,12 +204,12 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
           const [
             sku, barcode, name, description, categoryName, _shopName, quantity,
             brand, model, capacity, color, size, weight, expiryDate,
-            basePrice, costPrice, retailPrice, semiWholesalePrice, wholesalePrice,
+            sellingPrice, costPrice, retailPrice, semiWholesalePrice, wholesalePrice,
             minStock, isActive
           ] = values;
 
-          if (!name || !basePrice) {
-            errors.push({ row: i + 1, message: 'Nom et prix de base requis' });
+          if (!name || !sellingPrice) {
+            errors.push({ row: i + 1, message: 'Nom et prix de vente requis' });
             continue;
           }
 
@@ -236,7 +236,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
             size: size || null,
             weight: weight ? parseFloat(weight) : null,
             expiry_date: expiryDate || null,
-            base_price: parseFloat(basePrice) || 0,
+            selling_price: parseFloat(sellingPrice) || 0,
             cost_price: costPrice ? parseFloat(costPrice) : 0,
             retail_price: retailPrice ? parseFloat(retailPrice) : null,
             semi_wholesale_price: semiWholesalePrice ? parseFloat(semiWholesalePrice) : null,
@@ -400,7 +400,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
       'Taille',
       'Poids (kg)',
       'Date péremption',
-      'Prix de base (FCFA)',
+      'Prix de vente (FCFA)',
       'Prix d\'achat (FCFA)',
       'Prix Particulier (FCFA)',
       'Prix Demi-Grossiste (FCFA)',
@@ -572,7 +572,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
                     </label>
                   </div>
                   <div className="text-xs text-gray-500 space-y-1">
-                    <p><strong>Format attendu :</strong> SKU, Code-barre, Nom, Description, Catégorie, Boutique, <span className="text-green-600 font-semibold">Quantité en stock</span>, Marque, Modèle, Capacité, Couleur, Taille, Poids, Date péremption, Prix base, Prix achat, Prix Particulier, Prix Demi-Grossiste, Prix Grossiste, Stock min, Actif</p>
+                    <p><strong>Format attendu :</strong> SKU, Code-barre, Nom, Description, Catégorie, Boutique, <span className="text-green-600 font-semibold">Quantité en stock</span>, Marque, Modèle, Capacité, Couleur, Taille, Poids, Date péremption, Prix vente, Prix achat, Prix Particulier, Prix Demi-Grossiste, Prix Grossiste, Stock min, Actif</p>
                     <p><strong>Logique d'import :</strong></p>
                     <ul className="list-disc list-inside pl-2 space-y-1">
                       <li>Si le <strong>SKU existe déjà</strong> : mise à jour du produit + <span className="text-green-600 font-semibold">addition de la quantité</span> au stock existant</li>
@@ -581,7 +581,7 @@ export default function ImportExportModal({ shops, onClose, onImportComplete }: 
                     </ul>
                     <p><strong>Encodage :</strong> UTF-8</p>
                     <p><strong>Séparateur :</strong> Virgule (,)</p>
-                    <p><strong>Note :</strong> Nom et Prix de base sont obligatoires. La quantité s'additionne automatiquement si le produit existe.</p>
+                    <p><strong>Note :</strong> Nom et Prix de vente sont obligatoires. La quantité s'additionne automatiquement si le produit existe.</p>
                   </div>
                 </div>
               </div>

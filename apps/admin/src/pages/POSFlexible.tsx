@@ -16,7 +16,6 @@ interface Product {
   id: string;
   name: string;
   sku: string;
-  base_price: number;
   selling_price: number;
   wholesale_price: number | null;
   semi_wholesale_price: number | null;
@@ -123,13 +122,13 @@ export default function POSFlexible() {
   function getSuggestedPrice(product: Product, custType: string): number {
     switch (custType) {
       case 'WHOLESALE':
-        return product.wholesale_price || product.base_price;
+        return product.wholesale_price || product.selling_price;
       case 'SEMI_WHOLESALE':
-        return product.semi_wholesale_price || product.base_price;
+        return product.semi_wholesale_price || product.selling_price;
       case 'RETAIL':
-        return product.retail_price || product.selling_price || product.base_price;
+        return product.retail_price || product.selling_price;
       default:
-        return product.base_price;
+        return product.selling_price;
     }
   }
 

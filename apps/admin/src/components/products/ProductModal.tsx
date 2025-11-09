@@ -8,7 +8,7 @@ interface Product {
   description: string;
   sku: string;
   barcode: string;
-  base_price: number;
+  selling_price: number;
   cost_price: number;
   image_url: string | null;
   min_stock_level: number;
@@ -53,7 +53,7 @@ export default function ProductModal({ product, categories, shops, onClose, onSa
     shop_id: product?.shop_id || '',
     sku: product?.sku || '',
     barcode: product?.barcode || '',
-    base_price: product?.base_price || 0,
+    selling_price: product?.selling_price || 0,
     cost_price: product?.cost_price || 0,
     min_stock_level: product?.min_stock_level || 5,
     initial_quantity: 0, // Stock initial uniquement pour création
@@ -292,8 +292,8 @@ export default function ProductModal({ product, categories, shops, onClose, onSa
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input type="number" required min="0" step="0.01"
-                  value={formData.base_price}
-                  onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) })}
+                  value={formData.selling_price}
+                  onChange={(e) => setFormData({ ...formData, selling_price: parseFloat(e.target.value) })}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="50000" />
               </div>

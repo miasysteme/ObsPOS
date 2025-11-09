@@ -31,7 +31,7 @@ interface Product {
   description: string;
   sku: string;
   barcode: string;
-  base_price: number;
+  selling_price: number;
   cost_price: number;
   image_url: string | null;
   min_stock_level: number;
@@ -348,7 +348,7 @@ export default function Products() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.sku || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 font-medium">{product.base_price.toLocaleString()} F</div>
+                    <div className="text-sm text-gray-900 font-medium">{product.selling_price.toLocaleString()} F</div>
                     {product.cost_price > 0 && (
                       <div className="text-gray-500 text-xs">Coût: {product.cost_price.toLocaleString()} F</div>
                     )}
