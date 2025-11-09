@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Package,
   ShoppingCart,
+  BarChart3,
 } from 'lucide-react';
 import Establishments from './Establishments';
 import UsersPage from './Users';
@@ -19,6 +20,7 @@ import PaymentsPage from './Payments';
 import ShopsPage from './Shops';
 import ProductsPage from './Products';
 import POSPage from './POS';
+import ReportsPage from './Reports';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -183,6 +185,17 @@ export default function Dashboard() {
               <span className="font-medium">Point de Vente</span>
             </button>
             <button
+              onClick={() => setActiveTab('reports')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                activeTab === 'reports'
+                  ? 'bg-primary text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <BarChart3 className="w-5 h-5" />
+              <span className="font-medium">Rapports</span>
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
                 activeTab === 'settings'
@@ -282,8 +295,10 @@ export default function Dashboard() {
           {activeTab === 'products' && <ProductsPage />}
           
           {activeTab === 'pos' && <POSPage />}
+          
+          {activeTab === 'reports' && <ReportsPage />}
 
-          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && activeTab !== 'payments' && activeTab !== 'shops' && activeTab !== 'products' && activeTab !== 'pos' && (
+          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && activeTab !== 'payments' && activeTab !== 'shops' && activeTab !== 'products' && activeTab !== 'pos' && activeTab !== 'reports' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 {activeTab === 'settings' && 'Paramètres de la plateforme'}
