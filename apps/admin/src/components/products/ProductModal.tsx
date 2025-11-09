@@ -39,6 +39,9 @@ export default function ProductModal({ product, categories, onClose, onSave }: P
     cost_price: product?.cost_price || 0,
     min_stock_level: product?.min_stock_level || 5,
     is_active: product?.is_active ?? true,
+    retail_price: (product as any)?.retail_price || 0,
+    semi_wholesale_price: (product as any)?.semi_wholesale_price || 0,
+    wholesale_price: (product as any)?.wholesale_price || 0,
   });
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState(product?.image_url || '');
@@ -229,6 +232,39 @@ export default function ProductModal({ product, categories, onClose, onSave }: P
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="40000" />
               </div>
+            </div>
+
+            <div className="md:col-span-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-semibold text-blue-900 mb-3">Prix Suggérés par Type de Client (Optionnel)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-blue-700 mb-2">Particulier (F CFA)</label>
+                  <input type="number" min="0" step="0.01"
+                    value={formData.retail_price}
+                    onChange={(e) => setFormData({ ...formData, retail_price: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Prix détail" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-blue-700 mb-2">Demi-Grossiste (F CFA)</label>
+                  <input type="number" min="0" step="0.01"
+                    value={formData.semi_wholesale_price}
+                    onChange={(e) => setFormData({ ...formData, semi_wholesale_price: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Prix demi-gros" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-blue-700 mb-2">Grossiste (F CFA)</label>
+                  <input type="number" min="0" step="0.01"
+                    value={formData.wholesale_price}
+                    onChange={(e) => setFormData({ ...formData, wholesale_price: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Prix de gros" />
+                </div>
+              </div>
+              <p className="text-xs text-blue-600 mt-2">
+                Ces prix seront affichés comme suggestions dans le POS selon le type de client sélectionné. Le vendeur pourra toujours saisir un prix différent.
+              </p>
             </div>
 
             <div>

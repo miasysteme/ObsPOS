@@ -44,7 +44,7 @@ const CUSTOMER_TYPES: CustomerType[] = [
   { code: 'WHOLESALE', name: 'Grossiste' },
 ];
 
-export default function POS() {
+export default function POSFlexible() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
