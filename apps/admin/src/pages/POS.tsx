@@ -11,6 +11,11 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
+// TODO: Intégrer ces composants dans la prochaine itération
+// import CustomerSelectModal from '../components/pos/CustomerSelectModal';
+// import CashPaymentModal from '../components/pos/CashPaymentModal';
+// import ReceiptModal from '../components/pos/ReceiptModal';
+// import SalesHistoryPanel from '../components/pos/SalesHistoryPanel';
 
 interface Product {
   id: string;
@@ -44,6 +49,17 @@ const CUSTOMER_TYPES: CustomerType[] = [
   { code: 'WHOLESALE', name: 'Grossiste' },
 ];
 
+// TODO: Interface Customer pour prochaine itération
+// interface Customer {
+//   id: string;
+//   name: string;
+//   email: string | null;
+//   phone: string;
+//   customer_type: string;
+//   credit_limit: number;
+//   current_balance: number;
+// }
+
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -62,6 +78,17 @@ export default function POS() {
   // Modal pour éditer le prix dans le panier
   const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
   const [editPrice, setEditPrice] = useState<string>('');
+
+  // TODO: États pour fonctionnalités avancées (prochaine itération)
+  // const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  // const [showCustomerModal, setShowCustomerModal] = useState(false);
+  // const [discountType, setDiscountType] = useState<'NONE' | 'PERCENTAGE' | 'FIXED'>('NONE');
+  // const [discountValue, setDiscountValue] = useState<number>(0);
+  // const [showCashModal, setShowCashModal] = useState(false);
+  // const [showReceiptModal, setShowReceiptModal] = useState(false);
+  // const [lastSale, setLastSale] = useState<any>(null);
+  // const [activeView, setActiveView] = useState<'pos' | 'history'>('pos');
+  // const [dailyStats, setDailyStats] = useState({ sales: 0, revenue: 0, items: 0 });
 
   useEffect(() => {
     loadData();
@@ -335,8 +362,15 @@ export default function POS() {
     p.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Calculs panier (remise désactivée temporairement)
   const totalAmount = cart.reduce((sum, item) => sum + item.subtotal, 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  // TODO: Réactiver remise dans prochaine itération
+  // const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  // const discountAmount = discountType === 'PERCENTAGE' 
+  //   ? (subtotal * discountValue) / 100
+  //   : discountType === 'FIXED' ? discountValue : 0;
+  // const totalAmount = Math.max(0, subtotal - discountAmount);
 
   if (loading) {
     return (
