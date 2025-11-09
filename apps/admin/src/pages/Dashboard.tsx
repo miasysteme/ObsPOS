@@ -10,11 +10,13 @@ import {
   TrendingUp,
   DollarSign,
   ShoppingBag,
+  Package,
 } from 'lucide-react';
 import Establishments from './Establishments';
 import UsersPage from './Users';
 import PaymentsPage from './Payments';
 import ShopsPage from './Shops';
+import ProductsPage from './Products';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -157,6 +159,17 @@ export default function Dashboard() {
               <span className="font-medium">Boutiques</span>
             </button>
             <button
+              onClick={() => setActiveTab('products')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                activeTab === 'products'
+                  ? 'bg-primary text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <Package className="w-5 h-5" />
+              <span className="font-medium">Produits</span>
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
                 activeTab === 'settings'
@@ -252,8 +265,10 @@ export default function Dashboard() {
           {activeTab === 'payments' && <PaymentsPage />}
           
           {activeTab === 'shops' && <ShopsPage />}
+          
+          {activeTab === 'products' && <ProductsPage />}
 
-          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && activeTab !== 'payments' && activeTab !== 'shops' && (
+          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && activeTab !== 'payments' && activeTab !== 'shops' && activeTab !== 'products' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 {activeTab === 'settings' && 'Paramètres de la plateforme'}
