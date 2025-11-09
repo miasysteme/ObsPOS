@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSuperAdmin } from './lib/supabase';
+import { supabase, hasAdminAccess } from './lib/supabase';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 
@@ -18,7 +18,7 @@ function App() {
           setIsAuthenticated(true);
           setCheckingAdmin(true);
           
-          isSuperAdmin()
+          hasAdminAccess()
             .then(adminStatus => {
               setIsAdmin(adminStatus);
               setCheckingAdmin(false);
@@ -56,7 +56,7 @@ function App() {
         setCheckingAdmin(true);
         
         // Vérifier le statut admin en arrière-plan sans bloquer
-        isSuperAdmin()
+        hasAdminAccess()
           .then(adminStatus => {
             setIsAdmin(adminStatus);
             setCheckingAdmin(false);

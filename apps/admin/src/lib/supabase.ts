@@ -66,3 +66,16 @@ export async function isSuperAdmin() {
     return false;
   }
 }
+
+// Helper pour vérifier si l'utilisateur peut accéder à l'application admin
+// Rôles autorisés: super_admin, owner, admin, manager
+export async function hasAdminAccess() {
+  try {
+    const role = await getUserRole();
+    const adminRoles = ['super_admin', 'owner', 'admin', 'manager'];
+    return role?.role && adminRoles.includes(role.role);
+  } catch (error) {
+    console.error('Error in hasAdminAccess:', error);
+    return false;
+  }
+}
