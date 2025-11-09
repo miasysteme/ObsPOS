@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Establishments from './Establishments';
 import UsersPage from './Users';
+import PaymentsPage from './Payments';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -227,11 +228,12 @@ export default function Dashboard() {
           {activeTab === 'establishments' && <Establishments />}
           
           {activeTab === 'users' && <UsersPage />}
+          
+          {activeTab === 'payments' && <PaymentsPage />}
 
-          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && (
+          {activeTab !== 'dashboard' && activeTab !== 'establishments' && activeTab !== 'users' && activeTab !== 'payments' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                {activeTab === 'payments' && 'Gestion des paiements'}
                 {activeTab === 'settings' && 'Paramètres de la plateforme'}
               </h2>
               <div className="text-center text-gray-500 py-12">
