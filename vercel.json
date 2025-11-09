@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build:admin",
+  "outputDirectory": "apps/admin/dist",
+  "installCommand": "npm install",
+  "framework": null,
+  "redirects": [
+    {
+      "source": "/admin/:path*",
+      "destination": "/:path*",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "VITE_SUPABASE_URL": "https://frpaidnzwnokektodkay.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZycGFpZG56d25va2VrdG9ka2F5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1OTg5MTksImV4cCI6MjA3ODE3NDkxOX0.dyMlc6CZSxuhpbuDL5qoVEnWm7zftn68nlsUBDZ_1YQ",
+    "VITE_WAVE_API_KEY": "your_wave_api_key",
+    "VITE_WAVE_SECRET": "your_wave_secret",
+    "VITE_ADMIN_URL": "https://obs-systeme.store",
+    "VITE_CLIENT_URL": "https://obs-systeme.store",
+    "VITE_SUBSCRIPTION_PRICE": "20000",
+    "VITE_GRACE_PERIOD_DAYS": "10",
+    "VITE_LIMITED_SALES_PER_DAY": "10"
+  }
+}

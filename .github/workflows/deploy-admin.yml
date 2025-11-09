@@ -1,0 +1,71 @@
+name: 🚀 Deploy Admin to Vercel
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/admin/**'
+      - 'packages/**'
+      - 'vercel.json'
+      - '.github/workflows/deploy-admin.yml'
+  workflow_dispatch:
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://obs-systeme.store
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Type check
+        run: npm run type-check --workspace=apps/admin
+        continue-on-error: false
+
+      - name: 🏗️ Build application
+        run: npm run build:admin
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_ADMIN_URL: https://obs-systeme.store
+          VITE_CLIENT_URL: https://obs-systeme.store
+          VITE_SUBSCRIPTION_PRICE: "20000"
+          VITE_GRACE_PERIOD_DAYS: "10"
+          VITE_LIMITED_SALES_PER_DAY: "10"
+
+      - name: 🚀 Deploy to Vercel
+        id: deploy
+        run: |
+          npm install --global vercel@latest
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          DEPLOYMENT_URL=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $DEPLOYMENT_URL"
+
+      - name: 📊 Deployment Summary
+        run: |
+          echo "## 🎉 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌐 **Production URL**: https://obs-systeme.store" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 **Vercel URL**: ${{ steps.deploy.outputs.deployment_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 👤 **Author**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 📝 **Message**: ${{ github.event.head_commit.message }}" >> $GITHUB_STEP_SUMMARY
