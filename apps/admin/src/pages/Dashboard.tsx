@@ -57,7 +57,15 @@ export default function Dashboard() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+      // Force la redirection vers la page de login
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+      // Même en cas d'erreur, on redirige pour nettoyer l'état
+      window.location.href = '/';
+    }
   }
 
   return (
