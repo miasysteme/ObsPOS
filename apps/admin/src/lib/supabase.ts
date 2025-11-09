@@ -25,22 +25,30 @@ export async function getCurrentUser() {
   return user;
 }
 
-// Helper pour vérifier le rôle
+// Helper pour vérifier le rôle avec timeout
 export async function getUserRole() {
   try {
     const user = await getCurrentUser();
     if (!user) return null;
     
-    const { data, error } = await supabase
+    // Ajouter un timeout de 5 secondes
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout getting user role')), 5000)
+    );
+    
+    const queryPromise = supabase
       .from('users')
       .select('role, tenant_id, shop_id')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
+    
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
     
     if (error) {
       console.error('Error fetching user role:', error);
       return null;
     }
+    
     return data;
   } catch (error) {
     console.error('Error in getUserRole:', error);

@@ -7,6 +7,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   useEffect(() => {
     checkAuth();
@@ -14,14 +15,23 @@ function App() {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
-          setLoading(true);
-          const adminStatus = await isSuperAdmin();
-          setIsAdmin(adminStatus);
           setIsAuthenticated(true);
-          setLoading(false);
+          setCheckingAdmin(true);
+          
+          isSuperAdmin()
+            .then(adminStatus => {
+              setIsAdmin(adminStatus);
+              setCheckingAdmin(false);
+            })
+            .catch(error => {
+              console.error('Error checking admin status:', error);
+              setIsAdmin(false);
+              setCheckingAdmin(false);
+            });
         } else if (event === 'SIGNED_OUT') {
           setIsAuthenticated(false);
           setIsAdmin(false);
+          setCheckingAdmin(false);
         }
       }
     );
@@ -42,18 +52,32 @@ function App() {
       }
       
       if (session) {
-        const adminStatus = await isSuperAdmin();
-        setIsAdmin(adminStatus);
         setIsAuthenticated(true);
+        setCheckingAdmin(true);
+        
+        // Vérifier le statut admin en arrière-plan sans bloquer
+        isSuperAdmin()
+          .then(adminStatus => {
+            setIsAdmin(adminStatus);
+            setCheckingAdmin(false);
+          })
+          .catch(error => {
+            console.error('Error checking admin status:', error);
+            setIsAdmin(false);
+            setCheckingAdmin(false);
+          });
       } else {
         setIsAuthenticated(false);
         setIsAdmin(false);
+        setCheckingAdmin(false);
       }
     } catch (error) {
       console.error('Auth error:', error);
       setIsAuthenticated(false);
       setIsAdmin(false);
+      setCheckingAdmin(false);
     } finally {
+      // Toujours terminer le chargement même si la vérification admin est en cours
       setLoading(false);
     }
   }
@@ -71,6 +95,18 @@ function App() {
 
   if (!isAuthenticated) {
     return <LoginPage onLogin={() => checkAuth()} />;
+  }
+
+  // Afficher un écran de chargement pendant la vérification du statut admin
+  if (checkingAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Vérification des permissions...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!isAdmin) {
