@@ -54,6 +54,7 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterEstablishment, setFilterEstablishment] = useState<string>('all');
+  const [filterShop, setFilterShop] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
@@ -149,8 +150,9 @@ export default function Users() {
     
     const matchesRole = filterRole === 'all' || user.role === filterRole;
     const matchesEstablishment = filterEstablishment === 'all' || user.tenant_id === filterEstablishment;
+    const matchesShop = filterShop === 'all' || user.shop_id === filterShop;
 
-    return matchesSearch && matchesRole && matchesEstablishment;
+    return matchesSearch && matchesRole && matchesEstablishment && matchesShop;
   });
 
   const stats = {
@@ -247,6 +249,19 @@ export default function Users() {
               {establishments.map((est) => (
                 <option key={est.id} value={est.id}>
                   {est.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterShop}
+              onChange={(e) => setFilterShop(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="all">Toutes les boutiques</option>
+              {shops.map((shop) => (
+                <option key={shop.id} value={shop.id}>
+                  {shop.name}
                 </option>
               ))}
             </select>

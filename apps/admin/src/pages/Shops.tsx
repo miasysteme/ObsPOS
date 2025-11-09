@@ -13,7 +13,9 @@ import {
   DollarSign,
   TrendingUp,
   Package,
+  Eye,
 } from 'lucide-react';
+import ShopDetailModal from '../components/shops/ShopDetailModal';
 
 interface Shop {
   id: string;
@@ -52,6 +54,8 @@ export default function Shops() {
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [showPrintConfigModal, setShowPrintConfigModal] = useState(false);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailShop, setDetailShop] = useState<Shop | null>(null);
 
   useEffect(() => {
     // Load shops and establishments on component mount
@@ -90,17 +94,27 @@ export default function Shops() {
       // Load stats for each shop
       const shopsWithStats = await Promise.all(
         shopsData.map(async (shop: any) => {
+          // Count users
           const { count: usersCount } = await supabase
             .from('users')
             .select('*', { count: 'exact', head: true })
             .eq('shop_id', shop.id);
 
-          // Placeholder for sales stats (à implémenter avec la table sales)
+          // ✅ CORRECTION: Vraies stats ventes depuis table sales
+          const { data: salesData } = await supabase
+            .from('sales')
+            .select('total_amount')
+            .eq('shop_id', shop.id)
+            .eq('status', 'completed');
+
+          const salesCount = salesData?.length || 0;
+          const totalSales = salesData?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0;
+
           return {
             ...shop,
             users_count: usersCount || 0,
-            sales_count: 0,
-            total_sales: 0,
+            sales_count: salesCount,
+            total_sales: totalSales,
           };
         })
       );
@@ -326,6 +340,10 @@ export default function Shops() {
                 setSelectedShop(shop);
                 setShowPrintConfigModal(true);
               }}
+              onViewDetails={() => {
+                setDetailShop(shop);
+                setShowDetailModal(true);
+              }}
             />
           ))
         )}
@@ -362,6 +380,16 @@ export default function Shops() {
           }}
         />
       )}
+
+      {showDetailModal && detailShop && (
+        <ShopDetailModal
+          shop={detailShop}
+          onClose={() => {
+            setShowDetailModal(false);
+            setDetailShop(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -391,7 +419,7 @@ function StatCard({ title, value, icon: Icon, color, isAmount }: any) {
   );
 }
 
-function ShopCard({ shop, onEdit, onDelete, onToggleActive, onConfigurePrint }: any) {
+function ShopCard({ shop, onEdit, onDelete, onToggleActive, onConfigurePrint, onViewDetails }: any) {
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
       {/* Header with Logo */}
@@ -449,6 +477,14 @@ function ShopCard({ shop, onEdit, onDelete, onToggleActive, onConfigurePrint }: 
 
       {/* Actions */}
       <div className="border-t border-gray-200 p-3 bg-gray-50 flex gap-2">
+        <button
+          onClick={onViewDetails}
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-green-600 hover:bg-green-50 rounded transition"
+          title="Voir détails"
+        >
+          <Eye className="w-4 h-4" />
+          <span className="text-sm">Détails</span>
+        </button>
         <button
           onClick={onConfigurePrint}
           className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-purple-600 hover:bg-purple-50 rounded transition"

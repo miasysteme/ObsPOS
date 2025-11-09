@@ -80,6 +80,8 @@ export default function Inventory() {
   const [alerts, setAlerts] = useState<LowStockAlert[]>([]);
   const [searchAlerts, setSearchAlerts] = useState('');
   const [filterAlertLevel, setFilterAlertLevel] = useState('all');
+  const [filterShop, setFilterShop] = useState('all');
+  const [shops, setShops] = useState<any[]>([]);
   
   // Inventories data
   const [inventories, setInventories] = useState<PhysicalInventory[]>([]);
@@ -91,8 +93,18 @@ export default function Inventory() {
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
 
   useEffect(() => {
+    loadShops();
     loadData();
   }, [activeTab]);
+
+  async function loadShops() {
+    const { data } = await supabase
+      .from('shops')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    setShops(data || []);
+  }
 
   async function loadData() {
     setLoading(true);
@@ -229,15 +241,16 @@ export default function Inventory() {
     return matchesSearch && matchesStatus;
   });
 
-  const filteredAlerts = alerts.filter(a => {
-    const matchesSearch =
+  const filteredAlerts = alerts.filter((a: LowStockAlert) => {
+    const matchesSearch = 
       a.product_name.toLowerCase().includes(searchAlerts.toLowerCase()) ||
       a.sku.toLowerCase().includes(searchAlerts.toLowerCase()) ||
       a.shop_name.toLowerCase().includes(searchAlerts.toLowerCase());
     
     const matchesLevel = filterAlertLevel === 'all' || a.alert_level === filterAlertLevel;
+    const matchesShop = filterShop === 'all' || a.shop_id === filterShop;
     
-    return matchesSearch && matchesLevel;
+    return matchesSearch && matchesLevel && matchesShop;
   });
 
   const stats = {
@@ -508,6 +521,19 @@ export default function Inventory() {
                     <option value="OUT_OF_STOCK">Rupture</option>
                     <option value="CRITICAL">Critique</option>
                     <option value="LOW">Bas</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={filterShop}
+                    onChange={(e) => setFilterShop(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    <option value="all">Toutes les boutiques</option>
+                    {shops.map(shop => (
+                      <option key={shop.id} value={shop.id}>{shop.name}</option>
+                    ))}
                   </select>
                 </div>
                 
